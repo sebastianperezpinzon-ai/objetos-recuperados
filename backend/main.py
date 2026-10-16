@@ -1,10 +1,13 @@
 import os
 from typing import Optional, List
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, HTTPException, status, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr
 from dotenv import load_dotenv
 from supabase import create_client, Client
+
+# Importar servicio de correo de Office 365
+from email_service import enviar_correo_solicitud_reclamo
 
 # 1. Carga de variables de entorno
 load_dotenv()
@@ -21,7 +24,7 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 # 3. Inicialización de la aplicación FastAPI
 app = FastAPI(
     title="API REST - ECO-S EAN",
-    description="Sistema Nervioso Central para la gestión de objetos recuperados y trazabilidad del campus.",
+    description="Sistema Nervioso Central para la gestión de objetos recuperados, trazabilidad del campus y notificaciones institucionales.",
     version="1.0.0"
 )
 
@@ -57,6 +60,7 @@ class BajaRequest(BaseModel):
     categoria_retira: str
     nombre_retira: str
     id_funcionario: int  # Trazabilidad Operativa
+    correo_notificacion: Optional[str] = None  # Correo del estudiante/colaborador para constancia
 
 # ==========================================
 # RUTAS / ENDPOINTS
@@ -157,9 +161,9 @@ def registrar_objeto(objeto: ObjetoCreate):
         raise HTTPException(status_code=500, detail=f"Error al guardar objeto: {str(e)}")
 
 @app.post("/api/objetos/baja", tags=["Trazabilidad"])
-def procesar_salida_objeto(baja: BajaRequest):
+def procesar_salida_objeto(baja: BajaRequest, background_tasks: BackgroundTasks):
     try:
-        # 1. Registrar la trazabilidad de salida
+        # 1. Registrar la trazabilidad de salida en la tabla 'trazabilidad_salidas'
         registro_salida = {
             "codigo_objeto": baja.codigo_objeto,
             "id_funcionario": baja.id_funcionario,
@@ -176,7 +180,15 @@ def procesar_salida_objeto(baja: BajaRequest):
             .update({"estado_actual": baja.tipo_salida}) \
             .eq("codigo", baja.codigo_objeto) \
             .execute()
+
+        # 3. Tarea en segundo plano: envío asíncrono de correo mediante Office 365
+        if baja.correo_notificacion:
+            background_tasks.add_task(
+                enviar_correo_solicitud_reclamo,
+                destinatario_solicitante=baja.correo_notificacion,
+                datos_baja=baja.dict()
+            )
             
-        return {"mensaje": f"Objeto #{baja.codigo_objeto} actualizado exitosamente a estado '{baja.tipo_salida}'"}
+        return {"mensaje": f"Objeto #{baja.codigo_objeto} actualizado exitosamente a estado '{baja.tipo_salida}'."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al procesar la salida: {str(e)}")

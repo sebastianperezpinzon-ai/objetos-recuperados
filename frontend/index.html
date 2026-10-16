@@ -36,7 +36,7 @@
 
         <!-- Cuadrícula Dinámica de Objetos -->
         <div class="objects-grid" id="catalogoPublico">
-            <!-- Los objetos se inyectarán aquí mediante JavaScript -->
+            <!-- Los objetos se inyectarán aquí mediante JavaScript desde Supabase -->
         </div>
     </main>
 
@@ -48,10 +48,10 @@
                 <button class="btn-close" onclick="cerrarModalReclamo()">×</button>
             </div>
             
-            <form id="formReclamo" onsubmit="procesarReclamo(event)">
+            <form id="formReclamo" onsubmit="procesarReclamo(event)" autocomplete="off">
                 <div class="alert-info" style="margin-bottom: 1.5rem; padding: 1rem;">
                     <p style="margin: 0; font-size: 0.9rem;">
-                        Estás a punto de iniciar el proceso de recuperación para el objeto <strong id="reclamoCodigoVisible" style="font-size: 1.1rem; color: var(--primary-color);"></strong>.
+                        Estás a punto de iniciar el proceso de recuperación para el objeto <strong id="reclamoCodigoVisible" style="font-size: 1.1rem; color: var(--primary-color, #005A43);"></strong>.
                     </p>
                 </div>
                 
@@ -60,17 +60,17 @@
 
                 <div class="form-group">
                     <label for="reclamoNombre">Nombre Completo *</label>
-                    <input type="text" id="reclamoNombre" class="form-control" required placeholder="Ingresa tu nombre y apellido">
+                    <input type="text" id="reclamoNombre" class="form-control" required placeholder="Ingresa tu nombre y apellido" autocomplete="off">
                 </div>
 
                 <div class="form-group">
                     <label for="reclamoCorreo">Correo Institucional *</label>
-                    <input type="email" id="reclamoCorreo" class="form-control" required placeholder="usuario@institucion.edu.co">
+                    <input type="email" id="reclamoCorreo" class="form-control" required placeholder="usuario@institucion.edu.co" autocomplete="off">
                 </div>
 
                 <div class="form-group">
                     <label for="reclamoContacto">Número de Contacto (Celular) *</label>
-                    <input type="tel" id="reclamoContacto" class="form-control" required placeholder="Ej: 3001234567">
+                    <input type="tel" id="reclamoContacto" class="form-control" required placeholder="Ej: 3001234567" autocomplete="off">
                 </div>
 
                 <button type="submit" class="btn-primary btn-block">Enviar Solicitud y Notificar a Logística</button>
@@ -79,17 +79,45 @@
     </div>
 
     <script>
+        // Variable global para mantener el inventario traído desde Supabase
+        let objetosInventario = [];
+
         // ==========================================
-        // 1. Motor de Renderizado del Catálogo
+        // 1. Cargar Objetos desde la API REST (FastAPI / Supabase)
+        // ==========================================
+        async function cargarObjetosDesdeAPI() {
+            const contenedor = document.getElementById('catalogoPublico');
+            try {
+                const response = await fetch('http://127.0.0.1:8000/api/objetos');
+                if (!response.ok) throw new Error('Error al conectar con la base de datos');
+
+                objetosInventario = await response.json();
+                aplicarFiltros();
+            } catch (error) {
+                console.error('Error al cargar catálogo público:', error);
+                if (contenedor) {
+                    contenedor.innerHTML = `
+                        <div style="grid-column: 1 / -1; text-align: center; padding: 3rem; background: var(--white); border-radius: 8px; box-shadow: var(--shadow-sm);">
+                            <h3 style="color: #d93025;">Sin conexión con el catálogo central</h3>
+                            <p class="text-muted">No fue posible consultar el servidor en este momento. Por favor verifica que la API esté activa.</p>
+                        </div>`;
+                }
+            }
+        }
+
+        // ==========================================
+        // 2. Motor de Renderizado del Catálogo
         // ==========================================
         function renderizarTarjetas(listaObjetos) {
             const contenedor = document.getElementById('catalogoPublico');
-            contenedor.innerHTML = ''; // Limpiamos la cuadrícula
+            if (!contenedor) return;
+            
+            contenedor.innerHTML = ''; // Limpiar la cuadrícula
 
             if (listaObjetos.length === 0) {
                 contenedor.innerHTML = `
                     <div style="grid-column: 1 / -1; text-align: center; padding: 3rem; background: var(--white); border-radius: 8px; box-shadow: var(--shadow-sm);">
-                        <h3 style="color: var(--primary-color);">No hay objetos para mostrar</h3>
+                        <h3 style="color: var(--primary-color, #005A43);">No hay objetos para mostrar</h3>
                         <p class="text-muted">Actualmente no tenemos objetos activos que coincidan con tu búsqueda.</p>
                     </div>`;
                 return;
@@ -100,19 +128,18 @@
                 const tarjeta = document.createElement('article');
                 tarjeta.className = 'object-card';
                 
-                // Si la imagen no cargó correctamente, asignamos una por defecto
-                const imgSrc = objeto.fotoBase64 && objeto.fotoBase64.length > 20 
-                               ? objeto.fotoBase64 
+                const imgSrc = objeto.ruta_foto && objeto.ruta_foto.length > 20 
+                               ? objeto.ruta_foto 
                                : 'https://via.placeholder.com/400x300?text=Fotografía+No+Disponible';
 
                 tarjeta.innerHTML = `
                     <div class="card-image-wrapper">
-                        <img src="${imgSrc}" alt="Fotografía del objeto recuperado">
+                        <img src="${imgSrc}" alt="Fotografía del objeto recuperado #${objeto.codigo}" class="img-miniatura-zoom">
                     </div>
                     <div class="card-body">
                         <span class="tag-category">${objeto.clasificacion}</span>
                         <h2 class="card-title">Código #${objeto.codigo}</h2>
-                        <p class="card-date">Encontrado el: <strong>${objeto.fecha}</strong></p>
+                        <p class="card-date">Encontrado el: <strong>${objeto.fecha_hallazgo}</strong></p>
                         <p class="text-muted" style="font-size: 0.9rem; margin-bottom: 1rem;">${objeto.descripcion}</p>
                         <button class="btn-reclamar" onclick="iniciarReclamo(${objeto.codigo})">Reclamar Objeto</button>
                     </div>
@@ -122,26 +149,19 @@
         }
 
         // ==========================================
-        // 2. Lógica de Filtrado Público
+        // 3. Lógica de Filtrado Público
         // ==========================================
-        function obtenerActivos() {
-            const inventarioJSON = localStorage.getItem('ecos_inventario');
-            if (!inventarioJSON) return [];
-            const inventario = JSON.parse(inventarioJSON);
-            // El público solo puede ver lo que está "Activo"
-            return inventario.filter(obj => obj.estado === 'Activo');
-        }
-
         function aplicarFiltros() {
             const fechaFiltro = document.getElementById('filtroFecha').value;
             const clasificacionFiltro = document.getElementById('filtroClasificacion').value;
-            
-            const activos = obtenerActivos();
 
-            const filtrados = activos.filter(obj => {
-                const coincideFecha = fechaFiltro === "" || obj.fecha === fechaFiltro;
+            // Filtra únicamente los elementos activos provenientes de la API
+            const filtrados = objetosInventario.filter(obj => {
+                const esActivo = obj.estado_actual === 'Activo';
+                const coincideFecha = fechaFiltro === "" || obj.fecha_hallazgo === fechaFiltro;
                 const coincideClasificacion = clasificacionFiltro === "" || obj.clasificacion === clasificacionFiltro;
-                return coincideFecha && coincideClasificacion;
+                
+                return esActivo && coincideFecha && coincideClasificacion;
             });
 
             renderizarTarjetas(filtrados);
@@ -154,83 +174,68 @@
         }
 
         // ==========================================
-        // 3. Flujo de Reclamación (Preparado para Backend)
+        // 4. Flujo de Reclamación (Conectado a FastAPI y Office 365)
         // ==========================================
         const modalReclamo = document.getElementById('modalReclamo');
         const formReclamo = document.getElementById('formReclamo');
 
         function iniciarReclamo(codigo) {
-            // Inyectamos el código en la vista y en el input oculto
             document.getElementById('reclamoCodigoVisible').innerText = "#" + codigo;
             document.getElementById('reclamoCodigoElemento').value = codigo;
-            
-            // Desplegamos la ventana
-            modalReclamo.style.display = 'flex';
+            if (modalReclamo) modalReclamo.style.display = 'flex';
         }
 
         function cerrarModalReclamo() {
-            modalReclamo.style.display = 'none';
-            formReclamo.reset();
+            if (modalReclamo) modalReclamo.style.display = 'none';
+            if (formReclamo) formReclamo.reset();
         }
 
         async function procesarReclamo(event) {
             event.preventDefault();
 
-            // 1. Recolección y empaquetado de datos (Payload)
+            const codigoObjeto = parseInt(document.getElementById('reclamoCodigoElemento').value);
+            const nombreSolicitante = document.getElementById('reclamoNombre').value.trim();
+            const correoInstitucional = document.getElementById('reclamoCorreo').value.trim();
+            
+            const ahora = new Date();
+            const fechaSalida = ahora.toISOString().split('T')[0];
+            const horaSalida = `${String(ahora.getHours()).padStart(2, '0')}:${String(ahora.getMinutes()).padStart(2, '0')}`;
+
             const payload = {
-                codigo_objeto: document.getElementById('reclamoCodigoElemento').value,
-                nombre_solicitante: document.getElementById('reclamoNombre').value,
-                correo_institucional: document.getElementById('reclamoCorreo').value,
-                telefono_contacto: document.getElementById('reclamoContacto').value,
-                fecha_solicitud: new Date().toISOString()
+                codigo_objeto: codigoObjeto,
+                tipo_salida: "Reclamado",
+                fecha_salida: fechaSalida,
+                hora_salida: horaSalida,
+                categoria_retira: "Estudiante",
+                nombre_retira: nombreSolicitante,
+                id_funcionario: 1, // ID reservado para solicitudes automáticas públicas
+                correo_notificacion: correoInstitucional
             };
 
-            /* 
-               =============================================================
-               ZONA DE CONEXIÓN AL BACKEND (PYTHON/NODE.JS)
-               =============================================================
-               Aquí es donde la magia de Office 365 ocurrirá. 
-               El código está comentado para no generar errores mientras 
-               desarrollamos localmente, pero la estructura ya es funcional.
-               
-               try {
-                   const response = await fetch('/api/enviar-correo-reclamo', {
-                       method: 'POST',
-                       headers: {
-                           'Content-Type': 'application/json'
-                       },
-                       body: JSON.stringify(payload)
-                   });
+            try {
+                const response = await fetch('http://127.0.0.1:8000/api/objetos/baja', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
 
-                   if (!response.ok) throw new Error('Error al enviar el correo');
-                   
-                   const resultado = await response.json();
-                   alert("Tu solicitud ha sido enviada con éxito. Revisa tu correo institucional con las instrucciones de retiro.");
-                   cerrarModalReclamo();
+                if (!response.ok) throw new Error('Error al enviar la solicitud de reclamación');
 
-               } catch (error) {
-                   console.error("Error de red o servidor:", error);
-                   alert("Hubo un problema al procesar tu solicitud. Por favor acércate a la central de seguridad.");
-               }
-               =============================================================
-            */
+                const resultado = await response.json();
+                
+                alert(`¡Solicitud enviada exitosamente, ${nombreSolicitante}!\n\nSe ha enviado un correo automático con las instrucciones a:\n${correoInstitucional}\n\nCon copia a Logística y Seguridad para coordinar la entrega en el Sótano 1.`);
 
-            // SIMULACIÓN VISUAL (Mientras conectamos el servidor real)
-            console.log("Datos listos para enviar por Office 365:", payload);
-            alert(`¡Solicitud enviada, ${payload.nombre_solicitante}!\n\nSe ha disparado un correo automático a: ${payload.correo_institucional} y al equipo de Logística para gestionar la entrega del objeto #${payload.codigo_objeto} en el Sótano 1.`);
-            
-            cerrarModalReclamo();
+                cerrarModalReclamo();
+                cargarObjetosDesdeAPI(); // Recargar el catálogo para ocultar el objeto entregado
+            } catch (error) {
+                console.error("Error al procesar el reclamo:", error);
+                alert("Hubo un problema al procesar tu solicitud. Por favor acércate directamente a la central de seguridad en el Sótano 1.");
+            }
         }
 
-        // ==========================================
-        // 4. Arranque del Sistema Público
-        // ==========================================
+        // Inicialización
         window.onload = function() {
-            // Si el administrador nunca ha ingresado, creamos la BD vacía por seguridad
-            if (!localStorage.getItem('ecos_inventario')) {
-                localStorage.setItem('ecos_inventario', JSON.stringify([]));
-            }
-            aplicarFiltros();
+            cargarObjetosDesdeAPI();
         };
     </script>
 </body>
