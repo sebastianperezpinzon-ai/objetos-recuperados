@@ -22,7 +22,6 @@
             <div class="header-actions">
                 <h1>Atención en Central: Objetos</h1>
                 <div>
-                    <!-- Única función permitida fuera de la tabla: Alta de elementos -->
                     <button class="btn-primary" onclick="abrirModalCarga()">+ Registrar Elemento</button>
                 </div>
             </div>
@@ -36,8 +35,7 @@
             </div>
             
             <div class="filters-bar" style="margin-bottom: 1.5rem; background: var(--white); padding: 1rem; border-radius: 8px; box-shadow: var(--shadow-sm);">
-                <input type="text" id="buscadorCodigo" class="form-control" placeholder="🔍 Buscar por código para entregar (Ej: 1001)">
-                <!-- El usuario de registro solo opera sobre objetos activos listos para entrega -->
+                <input type="text" id="buscadorCodigo" class="form-control" placeholder="🔍 Buscar por código para entregar (Ej: 1001)" autocomplete="off">
                 <input type="hidden" id="filtroEstado" value="Activo">
             </div>
             
@@ -70,8 +68,8 @@
                 <button class="btn-close" onclick="cerrarModalCarga()">×</button>
             </div>
             
-            <form id="formSubirElemento" onsubmit="guardarElemento(event)">
-                <p class="text-muted" style="font-size: 0.85rem; margin-top: 0;">Código asignado: <strong id="codigoGenerado"></strong></p>
+            <form id="formSubirElemento" onsubmit="guardarElemento(event)" autocomplete="off">
+                <p class="text-muted" style="font-size: 0.85rem; margin-top: 0;">Código asignado: <strong id="codigoGenerado">--</strong></p>
 
                 <div class="form-group">
                     <label for="fechaHallazgo">Fecha de hallazgo *</label>
@@ -117,7 +115,7 @@
                 <h3>Procesar Salida</h3>
                 <button class="btn-close" onclick="cerrarModalBaja()">×</button>
             </div>
-            <form id="formBaja" onsubmit="guardarBaja(event)">
+            <form id="formBaja" onsubmit="guardarBaja(event)" autocomplete="off">
                 <p class="text-muted">Procesando código: <strong id="bajaCodigoVisible"></strong></p>
                 <input type="hidden" id="bajaCodigoElemento">
                 
@@ -146,16 +144,22 @@
                 
                 <div class="form-group">
                     <label>Nombre a quien se entrega o retira *</label>
-                    <input type="text" id="bajaNombre" class="form-control" required placeholder="Ej: Juan Pérez">
+                    <input type="text" id="bajaNombre" class="form-control" required placeholder="Ej: Juan Pérez" autocomplete="off">
                 </div>
 
-                <button type="submit" class="btn-primary btn-block" style="background-color: #d93025;">Confirmar Salida</button>
+                <!-- Campo de trazabilidad manual desvinculado de autocompletado del navegador -->
+                <div class="form-group" style="border-top: 1px dashed #ccc; padding-top: 1rem; margin-top: 1rem;">
+                    <label style="color: var(--primary-color, #005A43); font-weight: bold;">Funcionario que procesa la salida (Responsable en turno) *</label>
+                    <input type="text" id="bajaFuncionario" class="form-control" required placeholder="Nombre del colaborador en turno" autocomplete="new-password">
+                </div>
+
+                <button type="submit" class="btn-primary btn-block" style="background-color: #d93025; margin-top: 1rem;">Confirmar Salida</button>
             </form>
         </div>
     </div>
 
     <script>
-    // Validar sesión activa de rol Registro
+    // Validar sesión activa del usuario de Registro
     const usuarioActivo = JSON.parse(localStorage.getItem('ecos_usuario_activo'));
     if (!usuarioActivo) {
         window.location.href = 'login.html';
@@ -295,8 +299,11 @@
         if (form) form.reset();
     }
 
-    // Modales y Procesamiento de Salida / Baja
+    // Abrir modal de salida forzando reseteo completo y bloqueo de sugerencias del navegador
     function abrirBaja(codigo) {
+        const form = document.getElementById('formBaja');
+        if (form) form.reset();
+
         const elemVis = document.getElementById('bajaCodigoVisible');
         const elemVal = document.getElementById('bajaCodigoElemento');
         if (elemVis) elemVis.innerText = "#" + codigo;
@@ -309,6 +316,12 @@
         if (fechaInput) fechaInput.valueAsDate = ahora;
         if (horaInput) horaInput.value = `${String(ahora.getHours()).padStart(2, '0')}:${String(ahora.getMinutes()).padStart(2, '0')}`;
 
+        // Limpieza explícita del campo del funcionario responsable
+        const inputFuncionario = document.getElementById('bajaFuncionario');
+        if (inputFuncionario) {
+            inputFuncionario.value = '';
+        }
+
         const modal = document.getElementById('modalBaja');
         if (modal) modal.style.display = 'flex';
     }
@@ -320,8 +333,15 @@
         if (form) form.reset();
     }
 
+    // Procesar salida verificando firma manual
     async function guardarBaja(event) {
         event.preventDefault();
+
+        const funcionarioTurno = document.getElementById('bajaFuncionario').value.trim();
+        if (!funcionarioTurno) {
+            alert("Por favor ingrese el nombre del funcionario responsable del turno.");
+            return;
+        }
 
         const datosBaja = {
             codigo_objeto: parseInt(document.getElementById('bajaCodigoElemento').value),
@@ -330,7 +350,7 @@
             hora_salida: document.getElementById('bajaHora').value,
             categoria_retira: document.getElementById('bajaCategoria').value,
             nombre_retira: document.getElementById('bajaNombre').value,
-            id_funcionario: usuarioActivo.id_usuario // Trazabilidad automática con la sesión del funcionario
+            id_funcionario: usuarioActivo.id_usuario // Firma del usuario logueado en la sesión
         };
 
         try {

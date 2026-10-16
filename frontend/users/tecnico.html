@@ -5,8 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Panel Técnico - ECO-S</title>
     <link rel="stylesheet" href="../css/styles.css">
-    <!-- Librería SheetJS para exportación a Excel -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -16,18 +14,16 @@
         <nav class="sidebar">
             <h2>Técnico ECO-S</h2>
             <a href="#" class="nav-link active">Inventario Activo</a>
-            <a href="#" class="nav-link">Reportes (Excel)</a>
             <a href="login.html" class="nav-link btn-logout">Cerrar Sesión</a>
         </nav>
 
         <main class="main-content">
             
             <div class="header-actions">
-                <h1>Gestión Operativa de Objetos</h1>
+                <h1>Gestión Técnica: Verificación y Bajas</h1>
                 <div>
-                    <!-- Funciones permitidas: Carga y Reportes -->
-                    <button class="btn-primary" onclick="abrirModalCarga()">+ Subir Nuevo Elemento</button>
-                    <button class="btn-primary" style="background-color: #107C41;" onclick="descargarReporteExcel()">📥 Descargar Reporte</button>
+                    <!-- Alta de elementos -->
+                    <button class="btn-primary" onclick="abrirModalCarga()">+ Registrar Elemento</button>
                 </div>
             </div>
 
@@ -35,24 +31,13 @@
             <div class="stats-grid">
                 <div class="stat-card">
                     <h3 id="contadorActivos">--</h3>
-                    <p>Objetos Activos</p>
-                </div>
-                <div class="stat-card">
-                    <h3 id="contadorReclamados">--</h3>
-                    <p>Reclamados</p>
-                </div>
-                <div class="stat-card" style="border-bottom-color: #d93025;">
-                    <h3 id="contadorBajas">--</h3>
-                    <p>Dados de Baja</p>
+                    <p>Objetos Activos en Custodia</p>
                 </div>
             </div>
             
             <div class="filters-bar" style="margin-bottom: 1.5rem; background: var(--white); padding: 1rem; border-radius: 8px; box-shadow: var(--shadow-sm);">
-                <input type="text" id="buscadorCodigo" class="form-control" placeholder="🔍 Buscar por código (Ej: 1001)">
-                <select id="filtroEstado" class="form-control">
-                    <option value="Activo">Mostrar solo Activos</option>
-                    <option value="Todos">Mostrar Todos (Histórico completo)</option>
-                </select>
+                <input type="text" id="buscadorCodigo" class="form-control" placeholder="🔍 Buscar por código para verificar o procesar salida (Ej: 1001)" autocomplete="off">
+                <input type="hidden" id="filtroEstado" value="Activo">
             </div>
             
             <div class="table-container">
@@ -69,7 +54,7 @@
                             <th>Acciones</th>
                         </tr>
                     </thead>
-                    <tbody id="cuerpoTablaAdmin"></tbody>
+                    <tbody id="cuerpoTablaTecnico"></tbody>
                 </table>
             </div>
 
@@ -84,8 +69,8 @@
                 <button class="btn-close" onclick="cerrarModalCarga()">×</button>
             </div>
             
-            <form id="formSubirElemento" onsubmit="guardarElemento(event)">
-                <p class="text-muted" style="font-size: 0.85rem; margin-top: 0;">Código asignado: <strong id="codigoGenerado"></strong></p>
+            <form id="formSubirElemento" onsubmit="guardarElemento(event)" autocomplete="off">
+                <p class="text-muted" style="font-size: 0.85rem; margin-top: 0;">Código asignado: <strong id="codigoGenerado">--</strong></p>
 
                 <div class="form-group">
                     <label for="fechaHallazgo">Fecha de hallazgo *</label>
@@ -124,14 +109,14 @@
         </div>
     </div>
 
-    <!-- Modal: Dar de Baja -->
+    <!-- Modal: Dar de Baja / Procesar Salida -->
     <div id="modalBaja" class="modal-overlay">
         <div class="modal-content">
             <div class="modal-header">
                 <h3>Procesar Salida</h3>
                 <button class="btn-close" onclick="cerrarModalBaja()">×</button>
             </div>
-            <form id="formBaja" onsubmit="guardarBaja(event)">
+            <form id="formBaja" onsubmit="guardarBaja(event)" autocomplete="off">
                 <p class="text-muted">Procesando código: <strong id="bajaCodigoVisible"></strong></p>
                 <input type="hidden" id="bajaCodigoElemento">
                 
@@ -160,22 +145,22 @@
                 
                 <div class="form-group">
                     <label>Nombre a quien se entrega o retira *</label>
-                    <input type="text" id="bajaNombre" class="form-control" required placeholder="Ej: Juan Pérez">
+                    <input type="text" id="bajaNombre" class="form-control" required placeholder="Ej: Juan Pérez" autocomplete="off">
                 </div>
 
-                <!-- NUEVO CAMPO: Trazabilidad Operativa -->
+                <!-- Campo manual de trazabilidad libre y obligatoria para el técnico en turno -->
                 <div class="form-group" style="border-top: 1px dashed #ccc; padding-top: 1rem; margin-top: 1rem;">
-                    <label style="color: var(--primary-color);">Funcionario que procesa la salida (Responsable) *</label>
-                    <input type="text" id="bajaFuncionario" class="form-control" required placeholder="Nombre del colaborador en turno">
+                    <label style="color: var(--primary-color, #005A43); font-weight: bold;">Funcionario que procesa la salida (Responsable en turno) *</label>
+                    <input type="text" id="bajaFuncionario" class="form-control" required placeholder="Escriba su nombre completo (Ej. Carlos Rodríguez)" autocomplete="new-password">
                 </div>
 
-                <button type="submit" class="btn-primary btn-block" style="background-color: #d93025;">Confirmar Salida</button>
+                <button type="submit" class="btn-primary btn-block" style="background-color: #d93025; margin-top: 1rem;">Confirmar Salida</button>
             </form>
         </div>
     </div>
 
     <script>
-    // Validar sesión activa
+    // Validar sesión activa del usuario Técnico
     const usuarioActivo = JSON.parse(localStorage.getItem('ecos_usuario_activo'));
     if (!usuarioActivo) {
         window.location.href = 'login.html';
@@ -183,22 +168,93 @@
 
     let objetosInventario = [];
 
-    // Cargar inventario para el técnico
+    // Función auxiliar: Lectura asíncrona de la imagen a Base64
+    function convertirImagenABase64(archivo) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(archivo);
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = error => reject(error);
+        });
+    }
+
+    // Registrar objeto desde el panel de Técnico
+    async function guardarElemento(event) {
+        event.preventDefault();
+
+        const inputFoto = document.getElementById('fotoElemento') || document.getElementById('fotoObjeto');
+        const archivo = inputFoto && inputFoto.files ? inputFoto.files[0] : null;
+        let cadenaBase64 = null;
+
+        if (archivo) {
+            try {
+                cadenaBase64 = await convertirImagenABase64(archivo);
+            } catch (error) {
+                alert('Error al procesar la imagen seleccionada.');
+                return;
+            }
+        }
+
+        const nuevoObjeto = {
+            fecha_hallazgo: document.getElementById('fechaHallazgo').value,
+            lugar_hallazgo: document.getElementById('lugarHallazgo').value,
+            clasificacion: document.getElementById('clasificacion').value,
+            descripcion: document.getElementById('descripcion').value,
+            ruta_foto: cadenaBase64
+        };
+
+        try {
+            const response = await fetch('http://127.0.0.1:8000/api/objetos', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(nuevoObjeto)
+            });
+
+            if (!response.ok) throw new Error('Error al registrar el objeto');
+
+            const resultado = await response.json();
+            alert(`Objeto #${resultado.data.codigo} registrado exitosamente en Supabase.`);
+            
+            cerrarModalCarga();
+            cargarTablaTecnico();
+        } catch (error) {
+            alert(`Error: ${error.message}`);
+        }
+    }
+
+    // Consultar tabla de técnico
     async function cargarTablaTecnico() {
         const tbody = document.getElementById('cuerpoTablaTecnico') || document.getElementById('cuerpoTablaAdmin');
         if (!tbody) return;
 
         try {
             const response = await fetch('http://127.0.0.1:8000/api/objetos');
-            if (!response.ok) throw new Error('Error al cargar inventario');
+            if (!response.ok) throw new Error('Error de conexión');
 
             objetosInventario = await response.json();
+            
+            // Actualizar indicador de objetos activos
+            const activosCount = objetosInventario.filter(obj => obj.estado_actual === 'Activo').length;
+            const elemContador = document.getElementById('contadorActivos');
+            if (elemContador) elemContador.innerText = activosCount;
+
+            // Filtrado dinámico por búsqueda
+            const terminoBusqueda = document.getElementById('buscadorCodigo') ? document.getElementById('buscadorCodigo').value.trim().toLowerCase().replace('#', '') : "";
+            
+            const filtrados = objetosInventario.filter(obj => {
+                const coincideCodigo = String(obj.codigo).toLowerCase().includes(terminoBusqueda);
+                return coincideCodigo && obj.estado_actual === 'Activo';
+            });
+
             tbody.innerHTML = '';
 
-            objetosInventario.forEach(obj => {
-                const tr = document.createElement('tr');
-                const esActivo = obj.estado_actual === 'Activo';
+            if (filtrados.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding: 2rem; color: #6C757D;">No hay objetos activos que coincidan con la consulta.</td></tr>`;
+                return;
+            }
 
+            filtrados.forEach(obj => {
+                const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td><strong>#${obj.codigo}</strong></td>
                     <td>
@@ -210,23 +266,45 @@
                     <td>${obj.descripcion}</td>
                     <td>${obj.lugar_hallazgo}</td>
                     <td>${obj.fecha_hallazgo}</td>
-                    <td><span class="badge ${esActivo ? 'bg-success' : 'bg-secondary'}">${obj.estado_actual}</span></td>
+                    <td><span class="badge bg-success">${obj.estado_actual}</span></td>
                     <td>
-                        ${esActivo ? 
-                            `<button class="btn-sm btn-baja" onclick="abrirBaja(${obj.codigo})">Procesar Salida</button>` : 
-                            '<small class="text-muted">Procesado</small>'
-                        }
+                        <button class="btn-sm btn-baja" onclick="abrirBaja(${obj.codigo})">Procesar Salida</button>
                     </td>
                 `;
                 tbody.appendChild(tr);
             });
         } catch (error) {
-            console.error(error);
+            console.error('Error al cargar inventario:', error);
+            tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color: red; padding: 1rem;">Error de conexión con el servidor backend.</td></tr>`;
         }
     }
 
-    // Modal de salida
+    // Listener para búsqueda dinámica
+    const inputBuscador = document.getElementById('buscadorCodigo');
+    if (inputBuscador) {
+        inputBuscador.addEventListener('input', cargarTablaTecnico);
+    }
+
+    // Modales de Carga
+    function abrirModalCarga() {
+        const modal = document.getElementById('modalCarga');
+        if (modal) modal.style.display = 'flex';
+        const fechaInput = document.getElementById('fechaHallazgo');
+        if (fechaInput) fechaInput.valueAsDate = new Date();
+    }
+
+    function cerrarModalCarga() {
+        const modal = document.getElementById('modalCarga');
+        if (modal) modal.style.display = 'none';
+        const form = document.getElementById('formSubirElemento');
+        if (form) form.reset();
+    }
+
+    // Abrir modal de salida reseteando el formulario y vaciando el campo de funcionario
     function abrirBaja(codigo) {
+        const form = document.getElementById('formBaja');
+        if (form) form.reset();
+
         const elemVis = document.getElementById('bajaCodigoVisible');
         const elemVal = document.getElementById('bajaCodigoElemento');
         if (elemVis) elemVis.innerText = "#" + codigo;
@@ -239,6 +317,12 @@
         if (fechaInput) fechaInput.valueAsDate = ahora;
         if (horaInput) horaInput.value = `${String(ahora.getHours()).padStart(2, '0')}:${String(ahora.getMinutes()).padStart(2, '0')}`;
 
+        // Limpieza del campo del responsable
+        const inputFuncionario = document.getElementById('bajaFuncionario');
+        if (inputFuncionario) {
+            inputFuncionario.value = '';
+        }
+
         const modal = document.getElementById('modalBaja');
         if (modal) modal.style.display = 'flex';
     }
@@ -250,9 +334,15 @@
         if (form) form.reset();
     }
 
-    // Procesar baja o reclamo firmando con id_usuario
+    // Procesar salida verificando firma manual del técnico
     async function guardarBaja(event) {
         event.preventDefault();
+
+        const funcionarioTurno = document.getElementById('bajaFuncionario').value.trim();
+        if (!funcionarioTurno) {
+            alert("Por favor ingrese el nombre del funcionario responsable del turno.");
+            return;
+        }
 
         const datosBaja = {
             codigo_objeto: parseInt(document.getElementById('bajaCodigoElemento').value),
@@ -261,7 +351,7 @@
             hora_salida: document.getElementById('bajaHora').value,
             categoria_retira: document.getElementById('bajaCategoria').value,
             nombre_retira: document.getElementById('bajaNombre').value,
-            id_funcionario: usuarioActivo.id_usuario
+            id_funcionario: usuarioActivo.id_usuario // Firma digital de la cuenta autenticada
         };
 
         try {
@@ -271,7 +361,7 @@
                 body: JSON.stringify(datosBaja)
             });
 
-            if (!response.ok) throw new Error('Error al registrar la salida');
+            if (!response.ok) throw new Error('Error al registrar la salida en el servidor');
 
             const resultado = await response.json();
             alert(resultado.mensaje);
@@ -286,7 +376,7 @@
     window.onload = function() {
         cargarTablaTecnico();
     };
-</script>
-
+    </script>
+    
 </body>
 </html>
