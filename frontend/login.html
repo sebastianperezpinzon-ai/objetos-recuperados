@@ -41,51 +41,57 @@
     </main>
 
     <script>
-        function procesarLogin(event) {
-            event.preventDefault(); // Evita que la página se recargue
-            
-            // Capturamos lo ingresado por el usuario
-            const correoIngresado = document.getElementById('correoUsuario').value.trim().toLowerCase();
-            const passwordIngresado = document.getElementById('passwordUsuario').value;
-            const errorDiv = document.getElementById('mensajeError');
+        async function procesarLogin(event) {
+    event.preventDefault(); // Evita el recargado de la página
+    
+    const correoInput = document.getElementById('correoUsuario').value.trim().toLowerCase();
+    const passwordInput = document.getElementById('passwordUsuario').value;
+    const errorDiv = document.getElementById('mensajeError');
 
-            // Ocultamos mensajes de error previos
-            errorDiv.style.display = 'none';
+    // Limpiamos mensajes de error previos
+    errorDiv.style.display = 'none';
 
-            // 1. Conexión a la base de datos de usuarios
-            const usuariosJSON = localStorage.getItem('ecos_usuarios');
-            let usuarios = [];
-            
-            // Si la base de datos existe, la leemos. Si no, creamos el admin por defecto.
-            if (usuariosJSON) {
-                usuarios = JSON.parse(usuariosJSON);
-            } else {
-                usuarios = [{ id: 1, correo: "jsperez@universidadean.edu.co", password: "admin", rol: "Administrador" }];
-                localStorage.setItem('ecos_usuarios', JSON.stringify(usuarios));
-            }
+    try {
+        // 1. Petición HTTP POST a la API en FastAPI
+        const response = await fetch('http://127.0.0.1:8000/api/auth/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                correo: correoInput,
+                password: passwordInput
+            })
+        });
 
-            // 2. Proceso de Autenticación (Buscamos coincidencia exacta de correo y contraseña)
-            const usuarioAutenticado = usuarios.find(u => u.correo === correoIngresado && u.password === passwordIngresado);
+        const data = await response.json();
 
-            // 3. Enrutamiento Operativo
-            if (usuarioAutenticado) {
-                console.log(`Acceso concedido: ${usuarioAutenticado.correo} | Rol: ${usuarioAutenticado.rol}`);
-                
-                // Redirigimos según el rol establecido en la matriz
-                if (usuarioAutenticado.rol === 'Administrador') {
-                    window.location.href = 'users/administrator.html';
-                } 
-                else if (usuarioAutenticado.rol === 'Técnico') {
-                    window.location.href = 'users/tecnico.html';
-                } 
-                else if (usuarioAutenticado.rol === 'Registro') {
-                    window.location.href = 'users/registro.html';
-                }
-            } else {
-                // Si no hay coincidencia, bloqueamos el acceso
-                errorDiv.style.display = 'block';
-            }
+        // 2. Si la API responde con error (401, 403, 422, etc.)
+        if (!response.ok) {
+            throw new Error(data.detail || 'Credenciales incorrectas o usuario no autorizado.');
         }
+
+        // 3. Almacenamos la sesión del usuario activo (incluye su id_usuario para trazabilidad)
+        localStorage.setItem('ecos_usuario_activo', JSON.stringify(data.usuario));
+
+        console.log(`Sesión iniciada: ${data.usuario.correo} | Rol: ${data.usuario.rol}`);
+
+        // 4. Enrutamiento según el rol devuelto por la base de datos
+        const rol = data.usuario.rol;
+        if (rol === 'Administrador') {
+            window.location.href = 'users/administrator.html';
+        } else if (rol === 'Técnico') {
+            window.location.href = 'users/tecnico.html';
+        } else if (rol === 'Registro') {
+            window.location.href = 'users/registro.html';
+        }
+
+    } catch (error) {
+        // Muestra el mensaje devuelto por FastAPI en la interfaz
+        errorDiv.innerText = error.message;
+        errorDiv.style.display = 'block';
+    }
+}
     </script>
 </body>
 </html>
