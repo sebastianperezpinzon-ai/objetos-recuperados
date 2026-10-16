@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Administración - ECO-S</title>
+    <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body>
+
+    <div class="dashboard-wrapper">
+        
+        <!-- Menú Lateral -->
+        <nav class="sidebar">
+            <h2>Admin ECO-S</h2>
+            <a href="#" class="nav-link active" onclick="cambiarVista('vistaInventario', this)">Inventario Activo</a>
+            <a href="#" class="nav-link" onclick="cambiarVista('vistaUsuarios', this)">Gestión de Usuarios</a>
+            <a href="#" class="nav-link" onclick="descargarReporteExcel()">Reportes (Excel)</a>
+            <a href="../index.html" class="nav-link btn-logout">Cerrar Sesión</a>
+        </nav>
+
+        <!-- Contenido Principal -->
+        <main class="main-content">
+            
+            <!-- ========================================== -->
+            <!-- VISTA 1: INVENTARIO (Visible por defecto)  -->
+            <!-- ========================================== -->
+            <div id="vistaInventario">
+                <div class="header-actions">
+                    <h1>Gestión de Objetos Recuperados</h1>
+                    <div>
+                        <button class="btn-primary" onclick="abrirModalCarga()">+ Subir Nuevo Elemento</button>
+                    </div>
+                </div>
+
+                <!-- Panel de Indicadores Operativos -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h3 id="contadorActivos">--</h3>
+                        <p>Objetos Activos</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3 id="contadorReclamados">--</h3>
+                        <p>Reclamados</p>
+                    </div>
+                    <div class="stat-card" style="border-bottom-color: #d93025;">
+                        <h3 id="contadorBajas">--</h3>
+                        <p>Dados de Baja</p>
+                    </div>
+                </div>
+                
+                <!-- Barra de Filtros Administrativos -->
+                <div class="filters-bar" style="margin-bottom: 1.5rem; background: var(--white); padding: 1rem; border-radius: 8px; box-shadow: var(--shadow-sm);">
+                    <input type="text" id="buscadorCodigo" class="form-control" placeholder="🔍 Buscar por código (Ej: 1001)">
+                    <select id="filtroEstado" class="form-control">
+                        <option value="Activo">Mostrar solo Activos</option>
+                        <option value="Todos">Mostrar Todos (Histórico completo)</option>
+                    </select>
+                </div>
+                
+                <!-- Tabla de Inventario -->
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Código</th>
+                                <th>Foto</th>
+                                <th>Clasificación</th>
+                                <th>Descripción</th>
+                                <th>Lugar</th>
+                                <th>Fecha</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cuerpoTablaAdmin"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ========================================== -->
+            <!-- VISTA 2: GESTIÓN DE USUARIOS (Oculta)      -->
+            <!-- ========================================== -->
+            <div id="vistaUsuarios" style="display: none;">
+                <div class="header-actions">
+                    <h1>Control de Accesos Operativos</h1>
+                    <div>
+                        <button class="btn-primary" style="background-color: var(--secondary-color); color: #000;" onclick="abrirModalUsuario()">+ Nuevo Usuario</button>
+                    </div>
+                </div>
+
+                <div class="alert-info">
+                    <p><strong>Privacidad y Seguridad:</strong> Asigne roles estrictamente según la necesidad operativa. El rol <em>Registro</em> es ideal para el equipo de logística en central (Sótano 1).</p>
+                </div>
+
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Correo Institucional</th>
+                                <th>Rol Asignado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cuerpoTablaUsuarios"></tbody>
+                    </table>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- MODALES                                    -->
+    <!-- ========================================== -->
+    
+    <!-- Modal: Subir Elemento -->
+    <div id="modalCarga" class="modal-overlay">
+        <!-- (Mismo contenido del modalCarga anterior...) -->
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Registrar Objeto Recuperado</h3>
+                <button class="btn-close" onclick="cerrarModalCarga()">×</button>
+            </div>
+            <form id="formSubirElemento" onsubmit="guardarElemento(event)">
+                <p class="text-muted" style="margin-top: 0;">Código asignado: <strong id="codigoGenerado"></strong></p>
+                <div class="form-group"><label>Fecha *</label><input type="date" id="fechaHallazgo" class="form-control" required></div>
+                <div class="form-group"><label>Lugar exacto *</label><input type="text" id="lugarHallazgo" class="form-control" required></div>
+                <div class="form-group">
+                    <label>Clasificación *</label>
+                    <select id="clasificacion" class="form-control" required>
+                        <option value="">Seleccione...</option><option value="Accesorio">Accesorio</option><option value="Tecnología">Tecnología</option><option value="Ropa">Ropa</option><option value="Otros">Otros</option>
+                    </select>
+                </div>
+                <div class="form-group"><label>Descripción *</label><input type="text" id="descripcion" class="form-control" required></div>
+                <div class="form-group"><label>Foto *</label><input type="file" id="fotoElemento" class="form-control" accept="image/*" required></div>
+                <button type="submit" class="btn-primary btn-block">Guardar Objeto</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Dar de Baja -->
+    <div id="modalBaja" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Procesar Salida</h3>
+                <button class="btn-close" onclick="cerrarModalBaja()">×</button>
+            </div>
+            <form id="formBaja" onsubmit="guardarBaja(event)">
+                <p class="text-muted">Procesando código: <strong id="bajaCodigoVisible"></strong></p>
+                <input type="hidden" id="bajaCodigoElemento">
+                
+                <div class="form-group">
+                    <label>Tipo de Salida *</label>
+                    <select id="bajaEstado" class="form-control" required>
+                        <option value="Reclamado">Reclamado (Entregado a dueño)</option>
+                        <option value="Baja">Dado de baja (Donación/Disposición final)</option>
+                    </select>
+                </div>
+                
+                <div class="form-group" style="display:flex; gap:1rem;">
+                    <div style="flex:1;"><label>Fecha *</label><input type="date" id="bajaFecha" class="form-control" required></div>
+                    <div style="flex:1;"><label>Hora *</label><input type="time" id="bajaHora" class="form-control" required></div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Categoría de quien retira *</label>
+                    <select id="bajaCategoria" class="form-control" required>
+                        <option value="Estudiante">Estudiante</option>
+                        <option value="Colaborador">Colaborador</option>
+                        <option value="Proveedor">Proveedor</option>
+                        <option value="Otro">Otro</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>Nombre a quien se entrega o retira *</label>
+                    <input type="text" id="bajaNombre" class="form-control" required placeholder="Ej: Juan Pérez">
+                </div>
+
+                <!-- NUEVO CAMPO: Trazabilidad Operativa -->
+                <div class="form-group" style="border-top: 1px dashed #ccc; padding-top: 1rem; margin-top: 1rem;">
+                    <label style="color: var(--primary-color);">Funcionario que procesa la salida (Responsable) *</label>
+                    <input type="text" id="bajaFuncionario" class="form-control" required placeholder="Nombre del colaborador en turno">
+                </div>
+
+                <button type="submit" class="btn-primary btn-block" style="background-color: #d93025;">Confirmar Salida</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Crear Usuario -->
+    <div id="modalUsuario" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Crear Nuevo Usuario</h3>
+                <button class="btn-close" onclick="cerrarModalUsuario()">×</button>
+            </div>
+            <form id="formCrearUsuario" onsubmit="guardarUsuario(event)">
+                <div class="form-group">
+                    <label>Correo Institucional *</label>
+                    <input type="email" id="nuevoCorreo" class="form-control" required placeholder="usuario@institucion.edu.co">
+                </div>
+                <div class="form-group">
+                    <label>Contraseña Alfanumérica *</label>
+                    <input type="password" id="nuevaContrasena" class="form-control" required minlength="6">
+                </div>
+                <div class="form-group">
+                    <label>Rol asignado *</label>
+                    <select id="nuevoRol" class="form-control" required>
+                        <option value="">Seleccione un rol...</option>
+                        <option value="Administrador">Administrador</option>
+                        <option value="Técnico">Técnico</option>
+                        <option value="Registro">Registro</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn-primary btn-block">Registrar Usuario</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Librería para Excel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    <script>
+        // ==========================================
+        // 1. Navegación de Vistas (Pestañas)
+        // ==========================================
+        function cambiarVista(idVista, elementoMenu) {
+            // Ocultar todas las vistas
+            document.getElementById('vistaInventario').style.display = 'none';
+            document.getElementById('vistaUsuarios').style.display = 'none';
+            
+            // Mostrar la vista seleccionada
+            document.getElementById(idVista).style.display = 'block';
+
+            // Actualizar estilo visual del menú lateral
+            document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
+            elementoMenu.classList.add('active');
+
+            // Refrescar datos según la vista
+            if (idVista === 'vistaUsuarios') cargarTablaUsuarios();
+            if (idVista === 'vistaInventario') cargarTablaAdmin();
+        }
+
+        // ==========================================
+        // 2. Inicialización de Datos (Inventario y Usuarios)
+        // ==========================================
+        function inicializarBaseDatos() {
+            if (!localStorage.getItem('ecos_inventario')) {
+                localStorage.setItem('ecos_inventario', JSON.stringify([]));
+            }
+            if (!localStorage.getItem('ecos_usuarios')) {
+                const usuariosIniciales = [{ id: 1, correo: "admin@institucion.edu.co", rol: "Administrador" }];
+                localStorage.setItem('ecos_usuarios', JSON.stringify(usuariosIniciales));
+            }
+        }
+
+        // ==========================================
+        // 3. Módulo: Gestión de Usuarios
+        // ==========================================
+        const modalUsuario = document.getElementById('modalUsuario');
+
+        function abrirModalUsuario() { modalUsuario.style.display = 'flex'; }
+        function cerrarModalUsuario() { modalUsuario.style.display = 'none'; document.getElementById('formCrearUsuario').reset(); }
+
+        function cargarTablaUsuarios() {
+            const tbody = document.getElementById('cuerpoTablaUsuarios');
+            const usuarios = JSON.parse(localStorage.getItem('ecos_usuarios')) || [];
+            tbody.innerHTML = '';
+
+            usuarios.forEach(user => {
+                const tr = document.createElement('tr');
+                const esAdminPrincipal = user.correo === 'admin@institucion.edu.co';
+                
+                tr.innerHTML = `
+                    <td>${user.id}</td>
+                    <td><strong>${user.correo}</strong></td>
+                    <td><span class="tag-category">${user.rol}</span></td>
+                    <td>
+                        ${esAdminPrincipal 
+                            ? `<span class="text-muted" style="font-size: 0.85rem;">Sistema (Protegido)</span>` 
+                            : `<button class="btn-sm btn-delete" onclick="eliminarUsuario(${user.id})">Eliminar</button>`
+                        }
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function guardarUsuario(event) {
+            event.preventDefault();
+            const correo = document.getElementById('nuevoCorreo').value.trim().toLowerCase();
+            const password = document.getElementById('nuevaContrasena').value; // En un backend real, se aplica Hash aquí
+            const rol = document.getElementById('nuevoRol').value;
+
+            let usuarios = JSON.parse(localStorage.getItem('ecos_usuarios')) || [];
+
+            if (usuarios.some(u => u.correo === correo)) {
+                alert("Violación de integridad: El correo ya se encuentra registrado.");
+                return;
+            }
+
+            usuarios.push({ id: Date.now(), correo, password, rol });
+            localStorage.setItem('ecos_usuarios', JSON.stringify(usuarios));
+
+            alert(`Operador logístico registrado: ${correo} (${rol})`);
+            cerrarModalUsuario();
+            cargarTablaUsuarios();
+        }
+
+        function eliminarUsuario(id) {
+            if (confirm("¿Está seguro de revocar el acceso a este usuario?")) {
+                let usuarios = JSON.parse(localStorage.getItem('ecos_usuarios')) || [];
+                usuarios = usuarios.filter(u => u.id !== id);
+                localStorage.setItem('ecos_usuarios', JSON.stringify(usuarios));
+                cargarTablaUsuarios();
+            }
+        }
+
+        // ==========================================
+        // 4. Módulo: Inventario (Carga, Baja, Filtros y Excel)
+        // ==========================================
+        // (La lógica del inventario se mantiene intacta)
+        function actualizarContadores(inventario) {
+            document.getElementById('contadorActivos').innerText = inventario.filter(obj => obj.estado === 'Activo').length;
+            document.getElementById('contadorReclamados').innerText = inventario.filter(obj => obj.estado === 'Reclamado').length;
+            document.getElementById('contadorBajas').innerText = inventario.filter(obj => obj.estado === 'Baja').length;
+        }
+
+        function cargarTablaAdmin() {
+            const tbody = document.getElementById('cuerpoTablaAdmin');
+            const inventario = JSON.parse(localStorage.getItem('ecos_inventario')) || [];
+            
+            let terminoBusqueda = document.getElementById('buscadorCodigo') ? document.getElementById('buscadorCodigo').value.trim().toLowerCase().replace('#', '') : "";
+            const filtroEstado = document.getElementById('filtroEstado') ? document.getElementById('filtroEstado').value : "Activo";
+
+            actualizarContadores(inventario);
+            tbody.innerHTML = ''; 
+
+            const filtrados = inventario.filter(obj => {
+                return String(obj.codigo).toLowerCase().includes(terminoBusqueda) && 
+                       (filtroEstado === 'Todos' || obj.estado === filtroEstado);
+            });
+
+            if (filtrados.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding: 2rem; color: #6C757D;">Sin resultados para esta consulta espacial.</td></tr>`;
+                return;
+            }
+
+            filtrados.forEach(objeto => {
+                const tr = document.createElement('tr');
+                const colorEstado = objeto.estado === 'Activo' ? '#005A43' : '#721C24';
+                const bgEstado = objeto.estado === 'Activo' ? '#E8F5E9' : '#F8D7DA';
+                
+                tr.innerHTML = `
+                    <td><strong>#${objeto.codigo}</strong></td>
+                    <td><img src="${objeto.fotoBase64 || 'https://via.placeholder.com/40?text=Foto'}" alt="Foto" style="width:40px; height:40px; border-radius:4px; object-fit:cover;"></td>
+                    <td><span class="tag-category">${objeto.clasificacion}</span></td>
+                    <td>${objeto.descripcion}</td>
+                    <td>${objeto.lugar}</td>
+                    <td>${objeto.fecha}</td>
+                    <td><span style="font-size: 0.85rem; font-weight: bold; padding: 4px 8px; border-radius: 4px; background: ${bgEstado}; color: ${colorEstado};">${objeto.estado}</span></td>
+                    <td>
+                        ${objeto.estado === 'Activo' ? 
+                            `<button class="btn-sm btn-baja" onclick="abrirBaja(${objeto.codigo})">Dar de Baja</button>` 
+                            : '<span class="text-muted" style="font-size: 0.85rem;">Procesado</span>'
+                        }
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        document.getElementById('buscadorCodigo').addEventListener('input', cargarTablaAdmin);
+        document.getElementById('filtroEstado').addEventListener('change', cargarTablaAdmin);
+
+        // Funciones de Modal Inventario
+        const modalCarga = document.getElementById('modalCarga');
+        const modalBaja = document.getElementById('modalBaja');
+
+        function abrirModalCarga() {
+            const inv = JSON.parse(localStorage.getItem('ecos_inventario')) || [];
+            document.getElementById('codigoGenerado').innerText = "#" + (inv.length > 0 ? Math.max(...inv.map(i => i.codigo)) + 1 : 1001);
+            document.getElementById('fechaHallazgo').valueAsDate = new Date(); 
+            modalCarga.style.display = 'flex';
+        }
+        function cerrarModalCarga() { modalCarga.style.display = 'none'; document.getElementById('formSubirElemento').reset(); }
+
+        function guardarElemento(event) {
+            event.preventDefault();
+            const inv = JSON.parse(localStorage.getItem('ecos_inventario')) || [];
+            const codigo = inv.length > 0 ? Math.max(...inv.map(i => i.codigo)) + 1 : 1001;
+            const archivo = document.getElementById('fotoElemento').files[0];
+            const reader = new FileReader();
+
+            reader.onload = function(e) {
+                inv.unshift({
+                    codigo, fecha: document.getElementById('fechaHallazgo').value, lugar: document.getElementById('lugarHallazgo').value,
+                    clasificacion: document.getElementById('clasificacion').value, descripcion: document.getElementById('descripcion').value,
+                    fotoBase64: e.target.result, estado: 'Activo'
+                });
+                localStorage.setItem('ecos_inventario', JSON.stringify(inv));
+                cerrarModalCarga(); cargarTablaAdmin();
+            };
+            archivo ? reader.readAsDataURL(archivo) : reader.onload({target:{result:""}});
+        }
+
+        function abrirBaja(codigo) {
+            document.getElementById('bajaCodigoVisible').innerText = "#" + codigo;
+            document.getElementById('bajaCodigoElemento').value = codigo;
+            const ahora = new Date();
+            document.getElementById('bajaFecha').valueAsDate = ahora;
+            document.getElementById('bajaHora').value = `${String(ahora.getHours()).padStart(2, '0')}:${String(ahora.getMinutes()).padStart(2, '0')}`;
+            // Limpiamos el campo del funcionario por seguridad en cada nueva apertura
+            document.getElementById('bajaFuncionario').value = '';
+            modalBaja.style.display = 'flex';
+        }
+
+        function cerrarModalBaja() { 
+            modalBaja.style.display = 'none'; 
+            document.getElementById('formBaja').reset(); 
+        }
+
+        function guardarBaja(event) {
+            event.preventDefault();
+            const codigo = parseInt(document.getElementById('bajaCodigoElemento').value);
+            let inv = JSON.parse(localStorage.getItem('ecos_inventario')) || [];
+            const idx = inv.findIndex(obj => obj.codigo === codigo);
+            
+            if (idx !== -1) {
+                inv[idx].estado = document.getElementById('bajaEstado').value;
+                inv[idx].fechaSalida = document.getElementById('bajaFecha').value;
+                inv[idx].horaSalida = document.getElementById('bajaHora').value;
+                inv[idx].categoriaRetira = document.getElementById('bajaCategoria').value;
+                inv[idx].nombreRetira = document.getElementById('bajaNombre').value;
+                // NUEVO: Capturamos al funcionario responsable
+                inv[idx].funcionarioResponsable = document.getElementById('bajaFuncionario').value;
+                
+                localStorage.setItem('ecos_inventario', JSON.stringify(inv));
+                cerrarModalBaja(); 
+                cargarTablaAdmin();
+            }
+        }
+
+        // Exportar a Excel (SheetJS)
+        function descargarReporteExcel() {
+            const inv = JSON.parse(localStorage.getItem('ecos_inventario')) || [];
+            if (inv.length === 0) return alert("El ecosistema no contiene registros espaciales aún.");
+            
+            const datos = inv.map(obj => ({
+                "Código": obj.codigo, 
+                "Fecha Hallazgo": obj.fecha, 
+                "Lugar": obj.lugar, 
+                "Clasificación": obj.clasificacion,
+                "Descripción": obj.descripcion, 
+                "Estado": obj.estado, 
+                "Fecha Salida": obj.fechaSalida || "N/A",
+                "Hora Salida": obj.horaSalida || "N/A", 
+                "Categoría Retira": obj.categoriaRetira || "N/A", 
+                "Nombre Retira": obj.nombreRetira || "N/A",
+                "Funcionario Responsable": obj.funcionarioResponsable || "N/A" // NUEVO DATO INCLUIDO
+            }));
+            
+            const ws = XLSX.utils.json_to_sheet(datos);
+            // Ajustamos el ancho de las columnas (añadiendo una columna extra al final)
+            ws['!cols'] = [
+                {wch:10}, {wch:15}, {wch:30}, {wch:15}, {wch:40}, 
+                {wch:15}, {wch:15}, {wch:15}, {wch:20}, {wch:30}, {wch:25}
+            ];
+            
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Flujo_Objetos");
+            XLSX.writeFile(wb, `ECO-S_Trazabilidad_${new Date().toISOString().split('T')[0]}.xlsx`);
+        }
+
+        // ==========================================
+        // 5. Arranque del Sistema
+        // ==========================================
+        window.onload = function() {
+            inicializarBaseDatos();
+            cargarTablaAdmin();
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acceso Administrativo - ECO-S</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+    <main class="auth-wrapper">
+        <section class="auth-card">
+            <div class="auth-header">
+                <h2>Gestión Operativa</h2>
+                <p>Ingresa tus credenciales para administrar el inventario de objetos recuperados.</p>
+            </div>
+
+            <!-- Contenedor para mostrar errores de inicio de sesión -->
+            <div id="mensajeError" class="error-message">
+                Credenciales incorrectas o usuario no autorizado.
+            </div>
+
+            <form id="formLogin" onsubmit="procesarLogin(event)">
+                <div class="form-group">
+                    <label for="correoUsuario">Correo Institucional</label>
+                    <input type="email" id="correoUsuario" class="form-control" required placeholder="usuario@institucion.edu.co">
+                </div>
+
+                <div class="form-group">
+                    <label for="passwordUsuario">Contraseña</label>
+                    <input type="password" id="passwordUsuario" class="form-control" required placeholder="Ingresa tu contraseña alfanumérica">
+                </div>
+
+                <button type="submit" class="btn-primary btn-block">Iniciar Sesión</button>
+            </form>
+
+            <div class="auth-footer">
+                <a href="index.html">← Volver al catálogo público</a>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        function procesarLogin(event) {
+            event.preventDefault(); // Evita que la página se recargue
+            
+            // Capturamos lo ingresado por el usuario
+            const correoIngresado = document.getElementById('correoUsuario').value.trim().toLowerCase();
+            const passwordIngresado = document.getElementById('passwordUsuario').value;
+            const errorDiv = document.getElementById('mensajeError');
+
+            // Ocultamos mensajes de error previos
+            errorDiv.style.display = 'none';
+
+            // 1. Conexión a la base de datos de usuarios
+            const usuariosJSON = localStorage.getItem('ecos_usuarios');
+            let usuarios = [];
+            
+            // Si la base de datos existe, la leemos. Si no, creamos el admin por defecto.
+            if (usuariosJSON) {
+                usuarios = JSON.parse(usuariosJSON);
+            } else {
+                usuarios = [{ id: 1, correo: "jsperez@universidadean.edu.co", password: "admin", rol: "Administrador" }];
+                localStorage.setItem('ecos_usuarios', JSON.stringify(usuarios));
+            }
+
+            // 2. Proceso de Autenticación (Buscamos coincidencia exacta de correo y contraseña)
+            const usuarioAutenticado = usuarios.find(u => u.correo === correoIngresado && u.password === passwordIngresado);
+
+            // 3. Enrutamiento Operativo
+            if (usuarioAutenticado) {
+                console.log(`Acceso concedido: ${usuarioAutenticado.correo} | Rol: ${usuarioAutenticado.rol}`);
+                
+                // Redirigimos según el rol establecido en la matriz
+                if (usuarioAutenticado.rol === 'Administrador') {
+                    window.location.href = 'users/administrator.html';
+                } 
+                else if (usuarioAutenticado.rol === 'Técnico') {
+                    window.location.href = 'users/tecnico.html';
+                } 
+                else if (usuarioAutenticado.rol === 'Registro') {
+                    window.location.href = 'users/registro.html';
+                }
+            } else {
+                // Si no hay coincidencia, bloqueamos el acceso
+                errorDiv.style.display = 'block';
+            }
+        }
+    </script>
+</body>
+</html>

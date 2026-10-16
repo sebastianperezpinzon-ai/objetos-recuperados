@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Registro - ECO-S</title>
+    <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body>
+
+    <div class="dashboard-wrapper">
+        
+        <!-- Menú Lateral Registro -->
+        <nav class="sidebar">
+            <h2>Registro ECO-S</h2>
+            <a href="#" class="nav-link active">Inventario Activo</a>
+            <a href="login.html" class="nav-link btn-logout">Cerrar Sesión</a>
+        </nav>
+
+        <main class="main-content">
+            
+            <div class="header-actions">
+                <h1>Atención en Central: Objetos</h1>
+                <div>
+                    <!-- Única función permitida fuera de la tabla: Alta de elementos -->
+                    <button class="btn-primary" onclick="abrirModalCarga()">+ Registrar Elemento</button>
+                </div>
+            </div>
+
+            <!-- Panel de Indicadores y Filtros -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h3 id="contadorActivos">--</h3>
+                    <p>Objetos Activos en Central</p>
+                </div>
+            </div>
+            
+            <div class="filters-bar" style="margin-bottom: 1.5rem; background: var(--white); padding: 1rem; border-radius: 8px; box-shadow: var(--shadow-sm);">
+                <input type="text" id="buscadorCodigo" class="form-control" placeholder="🔍 Buscar por código para entregar (Ej: 1001)">
+                <!-- El usuario de registro solo opera sobre objetos activos listos para entrega -->
+                <input type="hidden" id="filtroEstado" value="Activo">
+            </div>
+            
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Código</th>
+                            <th>Foto</th>
+                            <th>Clasificación</th>
+                            <th>Descripción</th>
+                            <th>Lugar del Hallazgo</th>
+                            <th>Fecha</th>
+                            <th>Estado</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="cuerpoTablaAdmin"></tbody>
+                </table>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Modal para Subir Elemento -->
+    <div id="modalCarga" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Registrar Objeto Recuperado</h3>
+                <button class="btn-close" onclick="cerrarModalCarga()">×</button>
+            </div>
+            
+            <form id="formSubirElemento" onsubmit="guardarElemento(event)">
+                <p class="text-muted" style="font-size: 0.85rem; margin-top: 0;">Código asignado: <strong id="codigoGenerado"></strong></p>
+
+                <div class="form-group">
+                    <label for="fechaHallazgo">Fecha de hallazgo *</label>
+                    <input type="date" id="fechaHallazgo" class="form-control" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="lugarHallazgo">Lugar exacto (Texto libre) *</label>
+                    <input type="text" id="lugarHallazgo" class="form-control" required placeholder="Ej: Sótano 2, parqueadero de motos">
+                </div>
+
+                <div class="form-group">
+                    <label for="clasificacion">Clasificación *</label>
+                    <select id="clasificacion" class="form-control" required>
+                        <option value="">Seleccione una opción...</option>
+                        <option value="Accesorio">Accesorio</option>
+                        <option value="Joyería">Joyería</option>
+                        <option value="Ropa">Ropa</option>
+                        <option value="Tecnología">Tecnología</option>
+                        <option value="Otros">Otros</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="descripcion">Descripción corta *</label>
+                    <input type="text" id="descripcion" class="form-control" required placeholder="Color, marca, detalles particulares">
+                </div>
+
+                <div class="form-group">
+                    <label for="fotoElemento">Fotografía del elemento *</label>
+                    <input type="file" id="fotoElemento" class="form-control" accept="image/*" required>
+                </div>
+
+                <button type="submit" class="btn-primary btn-block">Guardar y Publicar en Catálogo</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Dar de Baja -->
+    <div id="modalBaja" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Procesar Salida</h3>
+                <button class="btn-close" onclick="cerrarModalBaja()">×</button>
+            </div>
+            <form id="formBaja" onsubmit="guardarBaja(event)">
+                <p class="text-muted">Procesando código: <strong id="bajaCodigoVisible"></strong></p>
+                <input type="hidden" id="bajaCodigoElemento">
+                
+                <div class="form-group">
+                    <label>Tipo de Salida *</label>
+                    <select id="bajaEstado" class="form-control" required>
+                        <option value="Reclamado">Reclamado (Entregado a dueño)</option>
+                        <option value="Baja">Dado de baja (Donación/Disposición final)</option>
+                    </select>
+                </div>
+                
+                <div class="form-group" style="display:flex; gap:1rem;">
+                    <div style="flex:1;"><label>Fecha *</label><input type="date" id="bajaFecha" class="form-control" required></div>
+                    <div style="flex:1;"><label>Hora *</label><input type="time" id="bajaHora" class="form-control" required></div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Categoría de quien retira *</label>
+                    <select id="bajaCategoria" class="form-control" required>
+                        <option value="Estudiante">Estudiante</option>
+                        <option value="Colaborador">Colaborador</option>
+                        <option value="Proveedor">Proveedor</option>
+                        <option value="Otro">Otro</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>Nombre a quien se entrega o retira *</label>
+                    <input type="text" id="bajaNombre" class="form-control" required placeholder="Ej: Juan Pérez">
+                </div>
+
+                <!-- NUEVO CAMPO: Trazabilidad Operativa -->
+                <div class="form-group" style="border-top: 1px dashed #ccc; padding-top: 1rem; margin-top: 1rem;">
+                    <label style="color: var(--primary-color);">Funcionario que procesa la salida (Responsable) *</label>
+                    <input type="text" id="bajaFuncionario" class="form-control" required placeholder="Nombre del colaborador en turno">
+                </div>
+
+                <button type="submit" class="btn-primary btn-block" style="background-color: #d93025;">Confirmar Salida</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // 1. Inicialización y Gestión de Datos Base
+        // ==========================================
+        function inicializarBaseDatos() {
+            if (!localStorage.getItem('ecos_inventario')) {
+                const datosPrueba = [
+                    { codigo: 1001, fecha: "2026-10-05", lugar: "Sótano 2 - Parqueadero", clasificacion: "Accesorio", descripcion: "Termo Metálico Azul Yeti", fotoBase64: "", estado: "Activo" },
+                    { codigo: 1002, fecha: "2026-10-06", lugar: "Biblioteca - Piso 3", clasificacion: "Tecnología", descripcion: "Calculadora Casio fx-991", fotoBase64: "", estado: "Activo" }
+                ];
+                localStorage.setItem('ecos_inventario', JSON.stringify(datosPrueba));
+            }
+        }
+
+        function actualizarContadores(inventario) {
+            const activos = inventario.filter(obj => obj.estado === 'Activo').length;
+            const reclamados = inventario.filter(obj => obj.estado === 'Reclamado').length;
+            const bajas = inventario.filter(obj => obj.estado === 'Baja').length;
+
+            document.getElementById('contadorActivos').innerText = activos;
+            document.getElementById('contadorReclamados').innerText = reclamados;
+            document.getElementById('contadorBajas').innerText = bajas;
+        }
+
+        // ==========================================
+        // 2. Lógica del Filtro y Tabla (Optimizada ECO-S)
+        // ==========================================
+        function cargarTablaAdmin() {
+            const tbody = document.getElementById('cuerpoTablaAdmin');
+            const inventarioJSON = localStorage.getItem('ecos_inventario');
+            
+            if (!inventarioJSON || !tbody) return;
+
+            const inventario = JSON.parse(inventarioJSON);
+            const inputBusqueda = document.getElementById('buscadorCodigo');
+            const selectEstado = document.getElementById('filtroEstado');
+            
+            // Limpieza del término de búsqueda (ignora '#' y espacios en blanco)
+            let terminoBusqueda = inputBusqueda ? inputBusqueda.value.trim().toLowerCase() : "";
+            terminoBusqueda = terminoBusqueda.replace('#', ''); 
+            
+            const filtroEstado = selectEstado ? selectEstado.value : "Activo";
+
+            actualizarContadores(inventario);
+            tbody.innerHTML = ''; 
+
+            const filtrados = inventario.filter(obj => {
+                const codigoString = String(obj.codigo).toLowerCase();
+                const coincideCodigo = codigoString.includes(terminoBusqueda);
+                const coincideEstado = filtroEstado === 'Todos' || obj.estado === filtroEstado;
+                return coincideCodigo && coincideEstado;
+            });
+
+            if (filtrados.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding: 2rem; color: #6C757D;">No se encontraron elementos con el código "${terminoBusqueda}"</td></tr>`;
+                return;
+            }
+
+            filtrados.forEach(objeto => {
+                const tr = document.createElement('tr');
+                const colorEstado = objeto.estado === 'Activo' ? '#005A43' : '#721C24';
+                const bgEstado = objeto.estado === 'Activo' ? '#E8F5E9' : '#F8D7DA';
+                const imgSrc = objeto.fotoBase64 || 'https://via.placeholder.com/40?text=Foto';
+
+                tr.innerHTML = `
+                    <td><strong>#${objeto.codigo}</strong></td>
+                    <td><img src="${imgSrc}" alt="Foto" style="width:40px; height:40px; border-radius:4px; object-fit:cover;"></td>
+                    <td><span class="tag-category">${objeto.clasificacion}</span></td>
+                    <td>${objeto.descripcion}</td>
+                    <td>${objeto.lugar}</td>
+                    <td>${objeto.fecha}</td>
+                    <td>
+                        <span style="font-size: 0.85rem; font-weight: bold; padding: 4px 8px; border-radius: 4px; background: ${bgEstado}; color: ${colorEstado};">
+                            ${objeto.estado}
+                        </span>
+                    </td>
+                    <td>
+                        ${objeto.estado === 'Activo' ? 
+                            `<button class="btn-sm btn-edit" title="Editar">✏️</button>
+                             <button class="btn-sm btn-baja" onclick="abrirBaja(${objeto.codigo})" title="Procesar Baja o Reclamo">Dar de Baja</button>` 
+                            : '<span class="text-muted" style="font-size: 0.85rem;">Procesado</span>'
+                        }
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Sensores de búsqueda en tiempo real
+        document.getElementById('buscadorCodigo').addEventListener('input', cargarTablaAdmin);
+        document.getElementById('filtroEstado').addEventListener('change', cargarTablaAdmin);
+
+        // ==========================================
+        // 3. Lógica del Modal (Subir Elemento)
+        // ==========================================
+        const modalCarga = document.getElementById('modalCarga');
+        const formSubir = document.getElementById('formSubirElemento');
+
+        function generarSiguienteCodigo() {
+            const inventario = JSON.parse(localStorage.getItem('ecos_inventario')) || [];
+            return inventario.length > 0 ? Math.max(...inventario.map(i => i.codigo)) + 1 : 1001;
+        }
+
+        function abrirModalCarga() {
+            document.getElementById('codigoGenerado').innerText = "#" + generarSiguienteCodigo();
+            document.getElementById('fechaHallazgo').valueAsDate = new Date(); 
+            modalCarga.style.display = 'flex';
+        }
+
+        function cerrarModalCarga() {
+            modalCarga.style.display = 'none';
+            formSubir.reset();
+        }
+
+        function guardarElemento(event) {
+            event.preventDefault();
+            
+            const archivoFoto = document.getElementById('fotoElemento').files[0];
+            const reader = new FileReader();
+
+            reader.onload = function(e) {
+                const nuevoObjeto = {
+                    codigo: generarSiguienteCodigo(),
+                    fecha: document.getElementById('fechaHallazgo').value,
+                    lugar: document.getElementById('lugarHallazgo').value,
+                    clasificacion: document.getElementById('clasificacion').value,
+                    descripcion: document.getElementById('descripcion').value,
+                    fotoBase64: e.target.result,
+                    estado: 'Activo'
+                };
+
+                const inventario = JSON.parse(localStorage.getItem('ecos_inventario')) || [];
+                inventario.unshift(nuevoObjeto);
+                localStorage.setItem('ecos_inventario', JSON.stringify(inventario));
+
+                alert('Objeto #' + nuevoObjeto.codigo + ' registrado exitosamente.');
+                cerrarModalCarga();
+                cargarTablaAdmin();
+            };
+            
+            if(archivoFoto) { 
+                reader.readAsDataURL(archivoFoto); 
+            } else {
+                reader.onload({target: {result: ""}});
+            }
+        }
+
+        // ==========================================
+        // Lógica del Modal (Salida / Dar de Baja)
+        // ==========================================
+        const modalBaja = document.getElementById('modalBaja');
+        const formBaja = document.getElementById('formBaja');
+
+        function abrirBaja(codigo) {
+            document.getElementById('bajaCodigoVisible').innerText = "#" + codigo;
+            document.getElementById('bajaCodigoElemento').value = codigo;
+            const ahora = new Date();
+            document.getElementById('bajaFecha').valueAsDate = ahora;
+            document.getElementById('bajaHora').value = `${String(ahora.getHours()).padStart(2, '0')}:${String(ahora.getMinutes()).padStart(2, '0')}`;
+            // Limpiamos el campo del funcionario por seguridad en cada nueva apertura
+            document.getElementById('bajaFuncionario').value = '';
+            modalBaja.style.display = 'flex';
+        }
+
+        function cerrarModalBaja() { 
+            modalBaja.style.display = 'none'; 
+            document.getElementById('formBaja').reset(); 
+        }
+
+        function guardarBaja(event) {
+            event.preventDefault();
+            const codigo = parseInt(document.getElementById('bajaCodigoElemento').value);
+            let inv = JSON.parse(localStorage.getItem('ecos_inventario')) || [];
+            const idx = inv.findIndex(obj => obj.codigo === codigo);
+            
+            if (idx !== -1) {
+                inv[idx].estado = document.getElementById('bajaEstado').value;
+                inv[idx].fechaSalida = document.getElementById('bajaFecha').value;
+                inv[idx].horaSalida = document.getElementById('bajaHora').value;
+                inv[idx].categoriaRetira = document.getElementById('bajaCategoria').value;
+                inv[idx].nombreRetira = document.getElementById('bajaNombre').value;
+                // NUEVO: Capturamos al funcionario responsable
+                inv[idx].funcionarioResponsable = document.getElementById('bajaFuncionario').value;
+                
+                localStorage.setItem('ecos_inventario', JSON.stringify(inv));
+                cerrarModalBaja(); 
+                cargarTablaAdmin();
+            }
+        }
+
+        // ==========================================
+        // 4. Arranque del Sistema
+        // ==========================================
+        window.onload = function() {
+            inicializarBaseDatos();
+            cargarTablaAdmin();
+        };
+    </script>
+    
+</body>
+</html>

@@ -1,0 +1,8 @@
+# Excluir claves secretas y variables de entorno
+backend/.env
+.env
+
+# Excluir entornos virtuales de Python
+venv/
+__pycache__/
+*.pyc

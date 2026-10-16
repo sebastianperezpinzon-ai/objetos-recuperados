@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Objetos Recuperados EAN</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+    <!-- Encabezado -->
+    <header class="navbar">
+        <h1>Objetos Recuperados EAN</h1>
+        <a href="login.html" class="btn-admin">Acceso Administrativo</a>
+    </header>
+
+    <main class="container">
+        <!-- Instrucciones Pedagógicas -->
+        <div class="alert-info">
+            <p><strong>Comunidad Universitaria:</strong> Busca tu objeto en nuestro catálogo. Si lo identificas, haz clic en <em>"Reclamar"</em> y diligencia los datos solicitados. Recuerda hacer memoria del espacio físico donde lo dejaste y acercarte a la central de seguridad en el <strong>sótano 1</strong> de lunes a viernes.</p>
+        </div>
+
+        <!-- Barra de Filtros Pública -->
+        <div class="filters-bar">
+            <input type="date" id="filtroFecha" class="form-control" title="Filtrar por fecha de hallazgo" onchange="aplicarFiltros()">
+            <select id="filtroClasificacion" class="form-control" title="Categoría del objeto" onchange="aplicarFiltros()">
+                <option value="">Todas las clasificaciones</option>
+                <option value="Accesorio">Accesorio</option>
+                <option value="Joyería">Joyería</option>
+                <option value="Ropa">Ropa</option>
+                <option value="Tecnología">Tecnología</option>
+                <option value="Otros">Otros</option>
+            </select>
+            <button class="btn-primary" onclick="limpiarFiltros()">Mostrar Todos</button>
+        </div>
+
+        <!-- Cuadrícula Dinámica de Objetos -->
+        <div class="objects-grid" id="catalogoPublico">
+            <!-- Los objetos se inyectarán aquí mediante JavaScript -->
+        </div>
+    </main>
+
+    <!-- Modal de Reclamación Pública -->
+    <div id="modalReclamo" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Solicitud de Reclamación</h3>
+                <button class="btn-close" onclick="cerrarModalReclamo()">×</button>
+            </div>
+            
+            <form id="formReclamo" onsubmit="procesarReclamo(event)">
+                <div class="alert-info" style="margin-bottom: 1.5rem; padding: 1rem;">
+                    <p style="margin: 0; font-size: 0.9rem;">
+                        Estás a punto de iniciar el proceso de recuperación para el objeto <strong id="reclamoCodigoVisible" style="font-size: 1.1rem; color: var(--primary-color);"></strong>.
+                    </p>
+                </div>
+                
+                <!-- Identificador interno oculto -->
+                <input type="hidden" id="reclamoCodigoElemento">
+
+                <div class="form-group">
+                    <label for="reclamoNombre">Nombre Completo *</label>
+                    <input type="text" id="reclamoNombre" class="form-control" required placeholder="Ingresa tu nombre y apellido">
+                </div>
+
+                <div class="form-group">
+                    <label for="reclamoCorreo">Correo Institucional *</label>
+                    <input type="email" id="reclamoCorreo" class="form-control" required placeholder="usuario@institucion.edu.co">
+                </div>
+
+                <div class="form-group">
+                    <label for="reclamoContacto">Número de Contacto (Celular) *</label>
+                    <input type="tel" id="reclamoContacto" class="form-control" required placeholder="Ej: 3001234567">
+                </div>
+
+                <button type="submit" class="btn-primary btn-block">Enviar Solicitud y Notificar a Logística</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // 1. Motor de Renderizado del Catálogo
+        // ==========================================
+        function renderizarTarjetas(listaObjetos) {
+            const contenedor = document.getElementById('catalogoPublico');
+            contenedor.innerHTML = ''; // Limpiamos la cuadrícula
+
+            if (listaObjetos.length === 0) {
+                contenedor.innerHTML = `
+                    <div style="grid-column: 1 / -1; text-align: center; padding: 3rem; background: var(--white); border-radius: 8px; box-shadow: var(--shadow-sm);">
+                        <h3 style="color: var(--primary-color);">No hay objetos para mostrar</h3>
+                        <p class="text-muted">Actualmente no tenemos objetos activos que coincidan con tu búsqueda.</p>
+                    </div>`;
+                return;
+            }
+
+            // Construcción de cada tarjeta
+            listaObjetos.forEach(objeto => {
+                const tarjeta = document.createElement('article');
+                tarjeta.className = 'object-card';
+                
+                // Si la imagen no cargó correctamente, asignamos una por defecto
+                const imgSrc = objeto.fotoBase64 && objeto.fotoBase64.length > 20 
+                               ? objeto.fotoBase64 
+                               : 'https://via.placeholder.com/400x300?text=Fotografía+No+Disponible';
+
+                tarjeta.innerHTML = `
+                    <div class="card-image-wrapper">
+                        <img src="${imgSrc}" alt="Fotografía del objeto recuperado">
+                    </div>
+                    <div class="card-body">
+                        <span class="tag-category">${objeto.clasificacion}</span>
+                        <h2 class="card-title">Código #${objeto.codigo}</h2>
+                        <p class="card-date">Encontrado el: <strong>${objeto.fecha}</strong></p>
+                        <p class="text-muted" style="font-size: 0.9rem; margin-bottom: 1rem;">${objeto.descripcion}</p>
+                        <button class="btn-reclamar" onclick="iniciarReclamo(${objeto.codigo})">Reclamar Objeto</button>
+                    </div>
+                `;
+                contenedor.appendChild(tarjeta);
+            });
+        }
+
+        // ==========================================
+        // 2. Lógica de Filtrado Público
+        // ==========================================
+        function obtenerActivos() {
+            const inventarioJSON = localStorage.getItem('ecos_inventario');
+            if (!inventarioJSON) return [];
+            const inventario = JSON.parse(inventarioJSON);
+            // El público solo puede ver lo que está "Activo"
+            return inventario.filter(obj => obj.estado === 'Activo');
+        }
+
+        function aplicarFiltros() {
+            const fechaFiltro = document.getElementById('filtroFecha').value;
+            const clasificacionFiltro = document.getElementById('filtroClasificacion').value;
+            
+            const activos = obtenerActivos();
+
+            const filtrados = activos.filter(obj => {
+                const coincideFecha = fechaFiltro === "" || obj.fecha === fechaFiltro;
+                const coincideClasificacion = clasificacionFiltro === "" || obj.clasificacion === clasificacionFiltro;
+                return coincideFecha && coincideClasificacion;
+            });
+
+            renderizarTarjetas(filtrados);
+        }
+
+        function limpiarFiltros() {
+            document.getElementById('filtroFecha').value = '';
+            document.getElementById('filtroClasificacion').value = '';
+            aplicarFiltros();
+        }
+
+        // ==========================================
+        // 3. Flujo de Reclamación (Preparado para Backend)
+        // ==========================================
+        const modalReclamo = document.getElementById('modalReclamo');
+        const formReclamo = document.getElementById('formReclamo');
+
+        function iniciarReclamo(codigo) {
+            // Inyectamos el código en la vista y en el input oculto
+            document.getElementById('reclamoCodigoVisible').innerText = "#" + codigo;
+            document.getElementById('reclamoCodigoElemento').value = codigo;
+            
+            // Desplegamos la ventana
+            modalReclamo.style.display = 'flex';
+        }
+
+        function cerrarModalReclamo() {
+            modalReclamo.style.display = 'none';
+            formReclamo.reset();
+        }
+
+        async function procesarReclamo(event) {
+            event.preventDefault();
+
+            // 1. Recolección y empaquetado de datos (Payload)
+            const payload = {
+                codigo_objeto: document.getElementById('reclamoCodigoElemento').value,
+                nombre_solicitante: document.getElementById('reclamoNombre').value,
+                correo_institucional: document.getElementById('reclamoCorreo').value,
+                telefono_contacto: document.getElementById('reclamoContacto').value,
+                fecha_solicitud: new Date().toISOString()
+            };
+
+            /* 
+               =============================================================
+               ZONA DE CONEXIÓN AL BACKEND (PYTHON/NODE.JS)
+               =============================================================
+               Aquí es donde la magia de Office 365 ocurrirá. 
+               El código está comentado para no generar errores mientras 
+               desarrollamos localmente, pero la estructura ya es funcional.
+               
+               try {
+                   const response = await fetch('/api/enviar-correo-reclamo', {
+                       method: 'POST',
+                       headers: {
+                           'Content-Type': 'application/json'
+                       },
+                       body: JSON.stringify(payload)
+                   });
+
+                   if (!response.ok) throw new Error('Error al enviar el correo');
+                   
+                   const resultado = await response.json();
+                   alert("Tu solicitud ha sido enviada con éxito. Revisa tu correo institucional con las instrucciones de retiro.");
+                   cerrarModalReclamo();
+
+               } catch (error) {
+                   console.error("Error de red o servidor:", error);
+                   alert("Hubo un problema al procesar tu solicitud. Por favor acércate a la central de seguridad.");
+               }
+               =============================================================
+            */
+
+            // SIMULACIÓN VISUAL (Mientras conectamos el servidor real)
+            console.log("Datos listos para enviar por Office 365:", payload);
+            alert(`¡Solicitud enviada, ${payload.nombre_solicitante}!\n\nSe ha disparado un correo automático a: ${payload.correo_institucional} y al equipo de Logística para gestionar la entrega del objeto #${payload.codigo_objeto} en el Sótano 1.`);
+            
+            cerrarModalReclamo();
+        }
+
+        // ==========================================
+        // 4. Arranque del Sistema Público
+        // ==========================================
+        window.onload = function() {
+            // Si el administrador nunca ha ingresado, creamos la BD vacía por seguridad
+            if (!localStorage.getItem('ecos_inventario')) {
+                localStorage.setItem('ecos_inventario', JSON.stringify([]));
+            }
+            aplicarFiltros();
+        };
+    </script>
+</body>
+</html>
