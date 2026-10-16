@@ -224,264 +224,299 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
     <script>
-        // ==========================================
-        // 1. Navegación de Vistas (Pestañas)
-        // ==========================================
-        function cambiarVista(idVista, elementoMenu) {
-            // Ocultar todas las vistas
-            document.getElementById('vistaInventario').style.display = 'none';
-            document.getElementById('vistaUsuarios').style.display = 'none';
+    // ==========================================
+    // 0. Sesión y Autenticación del Administrador
+    // ==========================================
+    const usuarioActivo = JSON.parse(localStorage.getItem('ecos_usuario_activo'));
+
+    if (!usuarioActivo) {
+        window.location.href = 'login.html';
+    } else {
+        console.log(`Sesión activa: ${usuarioActivo.correo} (ID: ${usuarioActivo.id_usuario})`);
+    }
+
+    // Variable global para mantener los objetos traídos de Supabase
+    let objetosInventario = [];
+
+    // ==========================================
+    // 1. Navegación de Vistas (Pestañas)
+    // ==========================================
+    function cambiarVista(idVista, elementoMenu) {
+        document.getElementById('vistaInventario').style.display = 'none';
+        document.getElementById('vistaUsuarios').style.display = 'none';
+        
+        document.getElementById(idVista).style.display = 'block';
+
+        document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
+        elementoMenu.classList.add('active');
+
+        if (idVista === 'vistaUsuarios') cargarTablaUsuarios();
+        if (idVista === 'vistaInventario') cargarTablaAdmin();
+    }
+
+    // ==========================================
+    // 2. Módulo Inventario: Conexión a FastAPI
+    // ==========================================
+    
+    // Contadores de la parte superior
+    function actualizarContadores(inventario) {
+        const elemActivos = document.getElementById('contadorActivos');
+        const elemReclamados = document.getElementById('contadorReclamados');
+        const elemBajas = document.getElementById('contadorBajas');
+
+        if (elemActivos) elemActivos.innerText = inventario.filter(obj => obj.estado_actual === 'Activo').length;
+        if (elemReclamados) elemReclamados.innerText = inventario.filter(obj => obj.estado_actual === 'Reclamado').length;
+        if (elemBajas) elemBajas.innerText = inventario.filter(obj => obj.estado_actual === 'Baja').length;
+    }
+
+    // Cargar y filtrar la tabla de inventario desde Supabase
+    async function cargarTablaAdmin() {
+        const tbody = document.getElementById('cuerpoTablaAdmin');
+        if (!tbody) return;
+
+        try {
+            // Petición GET al servidor FastAPI
+            const response = await fetch('http://127.0.0.1:8000/api/objetos');
+            if (!response.ok) throw new Error('Error al consultar la base de datos');
             
-            // Mostrar la vista seleccionada
-            document.getElementById(idVista).style.display = 'block';
-
-            // Actualizar estilo visual del menú lateral
-            document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
-            elementoMenu.classList.add('active');
-
-            // Refrescar datos según la vista
-            if (idVista === 'vistaUsuarios') cargarTablaUsuarios();
-            if (idVista === 'vistaInventario') cargarTablaAdmin();
-        }
-
-        // ==========================================
-        // 2. Inicialización de Datos (Inventario y Usuarios)
-        // ==========================================
-        function inicializarBaseDatos() {
-            if (!localStorage.getItem('ecos_inventario')) {
-                localStorage.setItem('ecos_inventario', JSON.stringify([]));
-            }
-            if (!localStorage.getItem('ecos_usuarios')) {
-                const usuariosIniciales = [{ id: 1, correo: "admin@institucion.edu.co", rol: "Administrador" }];
-                localStorage.setItem('ecos_usuarios', JSON.stringify(usuariosIniciales));
-            }
-        }
-
-        // ==========================================
-        // 3. Módulo: Gestión de Usuarios
-        // ==========================================
-        const modalUsuario = document.getElementById('modalUsuario');
-
-        function abrirModalUsuario() { modalUsuario.style.display = 'flex'; }
-        function cerrarModalUsuario() { modalUsuario.style.display = 'none'; document.getElementById('formCrearUsuario').reset(); }
-
-        function cargarTablaUsuarios() {
-            const tbody = document.getElementById('cuerpoTablaUsuarios');
-            const usuarios = JSON.parse(localStorage.getItem('ecos_usuarios')) || [];
-            tbody.innerHTML = '';
-
-            usuarios.forEach(user => {
-                const tr = document.createElement('tr');
-                const esAdminPrincipal = user.correo === 'admin@institucion.edu.co';
-                
-                tr.innerHTML = `
-                    <td>${user.id}</td>
-                    <td><strong>${user.correo}</strong></td>
-                    <td><span class="tag-category">${user.rol}</span></td>
-                    <td>
-                        ${esAdminPrincipal 
-                            ? `<span class="text-muted" style="font-size: 0.85rem;">Sistema (Protegido)</span>` 
-                            : `<button class="btn-sm btn-delete" onclick="eliminarUsuario(${user.id})">Eliminar</button>`
-                        }
-                    </td>
-                `;
-                tbody.appendChild(tr);
-            });
-        }
-
-        function guardarUsuario(event) {
-            event.preventDefault();
-            const correo = document.getElementById('nuevoCorreo').value.trim().toLowerCase();
-            const password = document.getElementById('nuevaContrasena').value; // En un backend real, se aplica Hash aquí
-            const rol = document.getElementById('nuevoRol').value;
-
-            let usuarios = JSON.parse(localStorage.getItem('ecos_usuarios')) || [];
-
-            if (usuarios.some(u => u.correo === correo)) {
-                alert("Violación de integridad: El correo ya se encuentra registrado.");
-                return;
-            }
-
-            usuarios.push({ id: Date.now(), correo, password, rol });
-            localStorage.setItem('ecos_usuarios', JSON.stringify(usuarios));
-
-            alert(`Operador logístico registrado: ${correo} (${rol})`);
-            cerrarModalUsuario();
-            cargarTablaUsuarios();
-        }
-
-        function eliminarUsuario(id) {
-            if (confirm("¿Está seguro de revocar el acceso a este usuario?")) {
-                let usuarios = JSON.parse(localStorage.getItem('ecos_usuarios')) || [];
-                usuarios = usuarios.filter(u => u.id !== id);
-                localStorage.setItem('ecos_usuarios', JSON.stringify(usuarios));
-                cargarTablaUsuarios();
-            }
-        }
-
-        // ==========================================
-        // 4. Módulo: Inventario (Carga, Baja, Filtros y Excel)
-        // ==========================================
-        // (La lógica del inventario se mantiene intacta)
-        function actualizarContadores(inventario) {
-            document.getElementById('contadorActivos').innerText = inventario.filter(obj => obj.estado === 'Activo').length;
-            document.getElementById('contadorReclamados').innerText = inventario.filter(obj => obj.estado === 'Reclamado').length;
-            document.getElementById('contadorBajas').innerText = inventario.filter(obj => obj.estado === 'Baja').length;
-        }
-
-        function cargarTablaAdmin() {
-            const tbody = document.getElementById('cuerpoTablaAdmin');
-            const inventario = JSON.parse(localStorage.getItem('ecos_inventario')) || [];
+            objetosInventario = await response.json();
             
-            let terminoBusqueda = document.getElementById('buscadorCodigo') ? document.getElementById('buscadorCodigo').value.trim().toLowerCase().replace('#', '') : "";
+            const terminoBusqueda = document.getElementById('buscadorCodigo') ? document.getElementById('buscadorCodigo').value.trim().toLowerCase().replace('#', '') : "";
             const filtroEstado = document.getElementById('filtroEstado') ? document.getElementById('filtroEstado').value : "Activo";
 
-            actualizarContadores(inventario);
+            actualizarContadores(objetosInventario);
             tbody.innerHTML = ''; 
 
-            const filtrados = inventario.filter(obj => {
-                return String(obj.codigo).toLowerCase().includes(terminoBusqueda) && 
-                       (filtroEstado === 'Todos' || obj.estado === filtroEstado);
+            const filtrados = objetosInventario.filter(obj => {
+                const coincideCodigo = String(obj.codigo).toLowerCase().includes(terminoBusqueda);
+                const coincideEstado = (filtroEstado === 'Todos' || obj.estado_actual === filtroEstado);
+                return coincideCodigo && coincideEstado;
             });
 
             if (filtrados.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding: 2rem; color: #6C757D;">Sin resultados para esta consulta espacial.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding: 2rem; color: #6C757D;">Sin resultados para esta consulta en la base de datos.</td></tr>`;
                 return;
             }
 
             filtrados.forEach(objeto => {
                 const tr = document.createElement('tr');
-                const colorEstado = objeto.estado === 'Activo' ? '#005A43' : '#721C24';
-                const bgEstado = objeto.estado === 'Activo' ? '#E8F5E9' : '#F8D7DA';
+                const esActivo = objeto.estado_actual === 'Activo';
+                const colorEstado = esActivo ? '#005A43' : '#721C24';
+                const bgEstado = esActivo ? '#E8F5E9' : '#F8D7DA';
                 
                 tr.innerHTML = `
                     <td><strong>#${objeto.codigo}</strong></td>
-                    <td><img src="${objeto.fotoBase64 || 'https://via.placeholder.com/40?text=Foto'}" alt="Foto" style="width:40px; height:40px; border-radius:4px; object-fit:cover;"></td>
+                    <td><img src="${objeto.ruta_foto || 'https://via.placeholder.com/40?text=Foto'}"alt="Objeto #${objeto.codigo}"class="img-miniatura-zoom"></td>
                     <td><span class="tag-category">${objeto.clasificacion}</span></td>
                     <td>${objeto.descripcion}</td>
-                    <td>${objeto.lugar}</td>
-                    <td>${objeto.fecha}</td>
-                    <td><span style="font-size: 0.85rem; font-weight: bold; padding: 4px 8px; border-radius: 4px; background: ${bgEstado}; color: ${colorEstado};">${objeto.estado}</span></td>
+                    <td>${objeto.lugar_hallazgo}</td>
+                    <td>${objeto.fecha_hallazgo}</td>
+                    <td><span style="font-size: 0.85rem; font-weight: bold; padding: 4px 8px; border-radius: 4px; background: ${bgEstado}; color: ${colorEstado};">${objeto.estado_actual}</span></td>
                     <td>
-                        ${objeto.estado === 'Activo' ? 
-                            `<button class="btn-sm btn-baja" onclick="abrirBaja(${objeto.codigo})">Dar de Baja</button>` 
-                            : '<span class="text-muted" style="font-size: 0.85rem;">Procesado</span>'
+                        ${esActivo ? 
+                            `<button class="btn-sm btn-baja" onclick="abrirBaja(${objeto.codigo})">Dar de Baja</button>` : 
+                            '<span class="text-muted" style="font-size: 0.85rem;">Procesado</span>'
                         }
                     </td>
                 `;
                 tbody.appendChild(tr);
             });
+        } catch (error) {
+            console.error('Error:', error);
+            tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color: red; padding: 1rem;">No se pudo conectar con la API en http://127.0.0.1:8000</td></tr>`;
         }
+    }
 
+    // Escuchadores de filtro y búsqueda
+    if (document.getElementById('buscadorCodigo')) {
         document.getElementById('buscadorCodigo').addEventListener('input', cargarTablaAdmin);
+    }
+    if (document.getElementById('filtroEstado')) {
         document.getElementById('filtroEstado').addEventListener('change', cargarTablaAdmin);
+    }
 
-        // Funciones de Modal Inventario
-        const modalCarga = document.getElementById('modalCarga');
-        const modalBaja = document.getElementById('modalBaja');
+    // Modal de Carga / Registro
+    const modalCarga = document.getElementById('modalCarga');
+    const modalBaja = document.getElementById('modalBaja');
 
-        function abrirModalCarga() {
-            const inv = JSON.parse(localStorage.getItem('ecos_inventario')) || [];
-            document.getElementById('codigoGenerado').innerText = "#" + (inv.length > 0 ? Math.max(...inv.map(i => i.codigo)) + 1 : 1001);
-            document.getElementById('fechaHallazgo').valueAsDate = new Date(); 
-            modalCarga.style.display = 'flex';
+    function abrirModalCarga() {
+        const fechaInput = document.getElementById('fechaHallazgo');
+        if (fechaInput) fechaInput.valueAsDate = new Date(); 
+        if (modalCarga) modalCarga.style.display = 'flex';
+    }
+
+    function cerrarModalCarga() { 
+        if (modalCarga) modalCarga.style.display = 'none'; 
+        const form = document.getElementById('formSubirElemento');
+        if (form) form.reset(); 
+    }
+
+    // Registrar objeto en Supabase a través de FastAPI
+    // Función auxiliar para convertir un archivo de imagen a texto Base64
+function convertirImagenABase64(archivo) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(archivo);
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = error => reject(error);
+    });
+}
+
+// Función principal para registrar el objeto en Supabase a través de FastAPI
+async function guardarElemento(event) {
+    event.preventDefault();
+
+    // 1. Obtener la referencia al archivo seleccionado en el input de tipo file
+    const inputFoto = document.getElementById('fotoElemento') || document.getElementById('fotoObjeto');
+    const archivo = inputFoto && inputFoto.files ? inputFoto.files[0] : null;
+
+    let cadenaBase64 = null;
+
+    // 2. Convertir la imagen a Base64 si el usuario seleccionó un archivo
+    if (archivo) {
+        try {
+            cadenaBase64 = await convertirImagenABase64(archivo);
+        } catch (error) {
+            console.error('Error al procesar la imagen:', error);
+            alert('No se pudo procesar la imagen seleccionada.');
+            return;
         }
-        function cerrarModalCarga() { modalCarga.style.display = 'none'; document.getElementById('formSubirElemento').reset(); }
+    }
 
-        function guardarElemento(event) {
-            event.preventDefault();
-            const inv = JSON.parse(localStorage.getItem('ecos_inventario')) || [];
-            const codigo = inv.length > 0 ? Math.max(...inv.map(i => i.codigo)) + 1 : 1001;
-            const archivo = document.getElementById('fotoElemento').files[0];
-            const reader = new FileReader();
+    // 3. Construir la estructura del objeto a enviar
+    const nuevoObjeto = {
+        fecha_hallazgo: document.getElementById('fechaHallazgo').value,
+        lugar_hallazgo: document.getElementById('lugarHallazgo').value,
+        clasificacion: document.getElementById('clasificacion').value,
+        descripcion: document.getElementById('descripcion').value,
+        ruta_foto: cadenaBase64 // Guarda la cadena 'data:image/...;base64,...' o null
+    };
 
-            reader.onload = function(e) {
-                inv.unshift({
-                    codigo, fecha: document.getElementById('fechaHallazgo').value, lugar: document.getElementById('lugarHallazgo').value,
-                    clasificacion: document.getElementById('clasificacion').value, descripcion: document.getElementById('descripcion').value,
-                    fotoBase64: e.target.result, estado: 'Activo'
-                });
-                localStorage.setItem('ecos_inventario', JSON.stringify(inv));
-                cerrarModalCarga(); cargarTablaAdmin();
-            };
-            archivo ? reader.readAsDataURL(archivo) : reader.onload({target:{result:""}});
-        }
+    try {
+        // 4. Enviar los datos mediante POST a la API REST de FastAPI
+        const response = await fetch('http://127.0.0.1:8000/api/objetos', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(nuevoObjeto)
+        });
 
-        function abrirBaja(codigo) {
-            document.getElementById('bajaCodigoVisible').innerText = "#" + codigo;
-            document.getElementById('bajaCodigoElemento').value = codigo;
-            const ahora = new Date();
-            document.getElementById('bajaFecha').valueAsDate = ahora;
-            document.getElementById('bajaHora').value = `${String(ahora.getHours()).padStart(2, '0')}:${String(ahora.getMinutes()).padStart(2, '0')}`;
-            // Limpiamos el campo del funcionario por seguridad en cada nueva apertura
-            document.getElementById('bajaFuncionario').value = '';
-            modalBaja.style.display = 'flex';
-        }
+        if (!response.ok) throw new Error('Error al registrar el objeto en el servidor');
 
-        function cerrarModalBaja() { 
-            modalBaja.style.display = 'none'; 
-            document.getElementById('formBaja').reset(); 
-        }
+        const resultado = await response.json();
+        alert(`Objeto #${resultado.data.codigo} registrado exitosamente en la nube.`);
+        
+        cerrarModalCarga(); 
+        cargarTablaAdmin();
+    } catch (error) {
+        alert(`Error: ${error.message}`);
+    }
+}
 
-        function guardarBaja(event) {
-            event.preventDefault();
-            const codigo = parseInt(document.getElementById('bajaCodigoElemento').value);
-            let inv = JSON.parse(localStorage.getItem('ecos_inventario')) || [];
-            const idx = inv.findIndex(obj => obj.codigo === codigo);
-            
-            if (idx !== -1) {
-                inv[idx].estado = document.getElementById('bajaEstado').value;
-                inv[idx].fechaSalida = document.getElementById('bajaFecha').value;
-                inv[idx].horaSalida = document.getElementById('bajaHora').value;
-                inv[idx].categoriaRetira = document.getElementById('bajaCategoria').value;
-                inv[idx].nombreRetira = document.getElementById('bajaNombre').value;
-                // NUEVO: Capturamos al funcionario responsable
-                inv[idx].funcionarioResponsable = document.getElementById('bajaFuncionario').value;
-                
-                localStorage.setItem('ecos_inventario', JSON.stringify(inv));
-                cerrarModalBaja(); 
-                cargarTablaAdmin();
-            }
-        }
+    // Modal de Baja / Salida
+    function abrirBaja(codigo) {
+        const elemVis = document.getElementById('bajaCodigoVisible');
+        const elemVal = document.getElementById('bajaCodigoElemento');
+        if (elemVis) elemVis.innerText = "#" + codigo;
+        if (elemVal) elemVal.value = codigo;
 
-        // Exportar a Excel (SheetJS)
-        function descargarReporteExcel() {
-            const inv = JSON.parse(localStorage.getItem('ecos_inventario')) || [];
-            if (inv.length === 0) return alert("El ecosistema no contiene registros espaciales aún.");
-            
-            const datos = inv.map(obj => ({
-                "Código": obj.codigo, 
-                "Fecha Hallazgo": obj.fecha, 
-                "Lugar": obj.lugar, 
-                "Clasificación": obj.clasificacion,
-                "Descripción": obj.descripcion, 
-                "Estado": obj.estado, 
-                "Fecha Salida": obj.fechaSalida || "N/A",
-                "Hora Salida": obj.horaSalida || "N/A", 
-                "Categoría Retira": obj.categoriaRetira || "N/A", 
-                "Nombre Retira": obj.nombreRetira || "N/A",
-                "Funcionario Responsable": obj.funcionarioResponsable || "N/A" // NUEVO DATO INCLUIDO
-            }));
-            
-            const ws = XLSX.utils.json_to_sheet(datos);
-            // Ajustamos el ancho de las columnas (añadiendo una columna extra al final)
-            ws['!cols'] = [
-                {wch:10}, {wch:15}, {wch:30}, {wch:15}, {wch:40}, 
-                {wch:15}, {wch:15}, {wch:15}, {wch:20}, {wch:30}, {wch:25}
-            ];
-            
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Flujo_Objetos");
-            XLSX.writeFile(wb, `ECO-S_Trazabilidad_${new Date().toISOString().split('T')[0]}.xlsx`);
-        }
+        const ahora = new Date();
+        const fechaSalida = document.getElementById('bajaFecha');
+        const horaSalida = document.getElementById('bajaHora');
 
-        // ==========================================
-        // 5. Arranque del Sistema
-        // ==========================================
-        window.onload = function() {
-            inicializarBaseDatos();
-            cargarTablaAdmin();
+        if (fechaSalida) fechaSalida.valueAsDate = ahora;
+        if (horaSalida) horaSalida.value = `${String(ahora.getHours()).padStart(2, '0')}:${String(ahora.getMinutes()).padStart(2, '0')}`;
+        
+        if (modalBaja) modalBaja.style.display = 'flex';
+    }
+
+    function cerrarModalBaja() { 
+        if (modalBaja) modalBaja.style.display = 'none'; 
+        const form = document.getElementById('formBaja');
+        if (form) form.reset(); 
+    }
+
+    // Procesar Baja o Reclamo en Supabase
+    async function guardarBaja(event) {
+        event.preventDefault();
+
+        const datosBaja = {
+            codigo_objeto: parseInt(document.getElementById('bajaCodigoElemento').value),
+            tipo_salida: document.getElementById('bajaEstado').value,
+            fecha_salida: document.getElementById('bajaFecha').value,
+            hora_salida: document.getElementById('bajaHora').value,
+            categoria_retira: document.getElementById('bajaCategoria').value,
+            nombre_retira: document.getElementById('bajaNombre').value,
+            id_funcionario: usuarioActivo.id_usuario // Firma automática del funcionario logueado
         };
-    </script>
+
+        try {
+            const response = await fetch('http://127.0.0.1:8000/api/objetos/baja', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(datosBaja)
+            });
+
+            if (!response.ok) throw new Error('Error al procesar la salida en el servidor');
+
+            const resultado = await response.json();
+            alert(resultado.mensaje);
+            cerrarModalBaja(); 
+            cargarTablaAdmin();
+        } catch (error) {
+            alert(`Error: ${error.message}`);
+        }
+    }
+
+    // Exportación de datos desde la API a Excel
+    function descargarReporteExcel() {
+        if (objetosInventario.length === 0) return alert("No hay datos cargados para exportar.");
+        
+        const datos = objetosInventario.map(obj => ({
+            "Código": obj.codigo, 
+            "Fecha Hallazgo": obj.fecha_hallazgo, 
+            "Lugar": obj.lugar_hallazgo, 
+            "Clasificación": obj.clasificacion,
+            "Descripción": obj.descripcion, 
+            "Estado": obj.estado_actual
+        }));
+        
+        const ws = XLSX.utils.json_to_sheet(datos);
+        ws['!cols'] = [{wch:10}, {wch:15}, {wch:30}, {wch:15}, {wch:40}, {wch:15}];
+        
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Inventario_ECO-S");
+        XLSX.writeFile(wb, `ECO-S_Inventario_${new Date().toISOString().split('T')[0]}.xlsx`);
+    }
+
+    // ==========================================
+    // 3. Módulo: Gestión de Usuarios
+    // ==========================================
+    const modalUsuario = document.getElementById('modalUsuario');
+
+    function abrirModalUsuario() { if (modalUsuario) modalUsuario.style.display = 'flex'; }
+    function cerrarModalUsuario() { if (modalUsuario) modalUsuario.style.display = 'none'; }
+
+    function cargarTablaUsuarios() {
+        const tbody = document.getElementById('cuerpoTablaUsuarios');
+        if (!tbody) return;
+        
+        // Muestra de usuario autenticado activo
+        tbody.innerHTML = `
+            <tr>
+                <td>${usuarioActivo.id_usuario}</td>
+                <td><strong>${usuarioActivo.correo}</strong></td>
+                <td><span class="tag-category">${usuarioActivo.rol}</span></td>
+                <td><span class="text-muted" style="font-size: 0.85rem;">Sesión Actual (Protegido)</span></td>
+            </tr>
+        `;
+    }
+
+    // ==========================================
+    // 4. Inicialización
+    // ==========================================
+    window.onload = function() {
+        cargarTablaAdmin();
+    };
+</script>
 </body>
 </html>

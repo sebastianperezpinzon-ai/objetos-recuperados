@@ -110,7 +110,7 @@
         </div>
     </div>
 
-    <!-- Modal: Dar de Baja -->
+    <!-- Modal: Dar de Baja / Procesar Salida -->
     <div id="modalBaja" class="modal-overlay">
         <div class="modal-content">
             <div class="modal-header">
@@ -149,214 +149,212 @@
                     <input type="text" id="bajaNombre" class="form-control" required placeholder="Ej: Juan Pérez">
                 </div>
 
-                <!-- NUEVO CAMPO: Trazabilidad Operativa -->
-                <div class="form-group" style="border-top: 1px dashed #ccc; padding-top: 1rem; margin-top: 1rem;">
-                    <label style="color: var(--primary-color);">Funcionario que procesa la salida (Responsable) *</label>
-                    <input type="text" id="bajaFuncionario" class="form-control" required placeholder="Nombre del colaborador en turno">
-                </div>
-
                 <button type="submit" class="btn-primary btn-block" style="background-color: #d93025;">Confirmar Salida</button>
             </form>
         </div>
     </div>
 
     <script>
-        // ==========================================
-        // 1. Inicialización y Gestión de Datos Base
-        // ==========================================
-        function inicializarBaseDatos() {
-            if (!localStorage.getItem('ecos_inventario')) {
-                const datosPrueba = [
-                    { codigo: 1001, fecha: "2026-10-05", lugar: "Sótano 2 - Parqueadero", clasificacion: "Accesorio", descripcion: "Termo Metálico Azul Yeti", fotoBase64: "", estado: "Activo" },
-                    { codigo: 1002, fecha: "2026-10-06", lugar: "Biblioteca - Piso 3", clasificacion: "Tecnología", descripcion: "Calculadora Casio fx-991", fotoBase64: "", estado: "Activo" }
-                ];
-                localStorage.setItem('ecos_inventario', JSON.stringify(datosPrueba));
+    // Validar sesión activa de rol Registro
+    const usuarioActivo = JSON.parse(localStorage.getItem('ecos_usuario_activo'));
+    if (!usuarioActivo) {
+        window.location.href = 'login.html';
+    }
+
+    let objetosInventario = [];
+
+    // Función auxiliar: Lectura asíncrona de la imagen a Base64
+    function convertirImagenABase64(archivo) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(archivo);
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = error => reject(error);
+        });
+    }
+
+    // Registrar objeto desde el panel de Registro
+    async function guardarElemento(event) {
+        event.preventDefault();
+
+        const inputFoto = document.getElementById('fotoElemento') || document.getElementById('fotoObjeto');
+        const archivo = inputFoto && inputFoto.files ? inputFoto.files[0] : null;
+        let cadenaBase64 = null;
+
+        if (archivo) {
+            try {
+                cadenaBase64 = await convertirImagenABase64(archivo);
+            } catch (error) {
+                alert('Error al procesar la imagen seleccionada.');
+                return;
             }
         }
 
-        function actualizarContadores(inventario) {
-            const activos = inventario.filter(obj => obj.estado === 'Activo').length;
-            const reclamados = inventario.filter(obj => obj.estado === 'Reclamado').length;
-            const bajas = inventario.filter(obj => obj.estado === 'Baja').length;
+        const nuevoObjeto = {
+            fecha_hallazgo: document.getElementById('fechaHallazgo').value,
+            lugar_hallazgo: document.getElementById('lugarHallazgo').value,
+            clasificacion: document.getElementById('clasificacion').value,
+            descripcion: document.getElementById('descripcion').value,
+            ruta_foto: cadenaBase64
+        };
 
-            document.getElementById('contadorActivos').innerText = activos;
-            document.getElementById('contadorReclamados').innerText = reclamados;
-            document.getElementById('contadorBajas').innerText = bajas;
-        }
-
-        // ==========================================
-        // 2. Lógica del Filtro y Tabla (Optimizada ECO-S)
-        // ==========================================
-        function cargarTablaAdmin() {
-            const tbody = document.getElementById('cuerpoTablaAdmin');
-            const inventarioJSON = localStorage.getItem('ecos_inventario');
-            
-            if (!inventarioJSON || !tbody) return;
-
-            const inventario = JSON.parse(inventarioJSON);
-            const inputBusqueda = document.getElementById('buscadorCodigo');
-            const selectEstado = document.getElementById('filtroEstado');
-            
-            // Limpieza del término de búsqueda (ignora '#' y espacios en blanco)
-            let terminoBusqueda = inputBusqueda ? inputBusqueda.value.trim().toLowerCase() : "";
-            terminoBusqueda = terminoBusqueda.replace('#', ''); 
-            
-            const filtroEstado = selectEstado ? selectEstado.value : "Activo";
-
-            actualizarContadores(inventario);
-            tbody.innerHTML = ''; 
-
-            const filtrados = inventario.filter(obj => {
-                const codigoString = String(obj.codigo).toLowerCase();
-                const coincideCodigo = codigoString.includes(terminoBusqueda);
-                const coincideEstado = filtroEstado === 'Todos' || obj.estado === filtroEstado;
-                return coincideCodigo && coincideEstado;
+        try {
+            const response = await fetch('http://127.0.0.1:8000/api/objetos', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(nuevoObjeto)
             });
 
+            if (!response.ok) throw new Error('Error al registrar el objeto');
+
+            const resultado = await response.json();
+            alert(`Objeto #${resultado.data.codigo} registrado exitosamente en Supabase.`);
+            
+            cerrarModalCarga();
+            cargarTablaRegistro();
+        } catch (error) {
+            alert(`Error: ${error.message}`);
+        }
+    }
+
+    // Consultar tabla de registro
+    async function cargarTablaRegistro() {
+        const tbody = document.getElementById('cuerpoTablaAdmin') || document.getElementById('cuerpoTablaRegistro');
+        if (!tbody) return;
+
+        try {
+            const response = await fetch('http://127.0.0.1:8000/api/objetos');
+            if (!response.ok) throw new Error('Error de conexión');
+
+            objetosInventario = await response.json();
+            
+            // Actualizar indicador de objetos activos en la interfaz
+            const activosCount = objetosInventario.filter(obj => obj.estado_actual === 'Activo').length;
+            const elemContador = document.getElementById('contadorActivos');
+            if (elemContador) elemContador.innerText = activosCount;
+
+            // Filtrado dinámico por búsqueda
+            const terminoBusqueda = document.getElementById('buscadorCodigo') ? document.getElementById('buscadorCodigo').value.trim().toLowerCase().replace('#', '') : "";
+            
+            const filtrados = objetosInventario.filter(obj => {
+                const coincideCodigo = String(obj.codigo).toLowerCase().includes(terminoBusqueda);
+                return coincideCodigo && obj.estado_actual === 'Activo';
+            });
+
+            tbody.innerHTML = '';
+
             if (filtrados.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding: 2rem; color: #6C757D;">No se encontraron elementos con el código "${terminoBusqueda}"</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding: 2rem; color: #6C757D;">No hay objetos activos que coincidan con la consulta.</td></tr>`;
                 return;
             }
 
-            filtrados.forEach(objeto => {
+            filtrados.forEach(obj => {
                 const tr = document.createElement('tr');
-                const colorEstado = objeto.estado === 'Activo' ? '#005A43' : '#721C24';
-                const bgEstado = objeto.estado === 'Activo' ? '#E8F5E9' : '#F8D7DA';
-                const imgSrc = objeto.fotoBase64 || 'https://via.placeholder.com/40?text=Foto';
-
                 tr.innerHTML = `
-                    <td><strong>#${objeto.codigo}</strong></td>
-                    <td><img src="${imgSrc}" alt="Foto" style="width:40px; height:40px; border-radius:4px; object-fit:cover;"></td>
-                    <td><span class="tag-category">${objeto.clasificacion}</span></td>
-                    <td>${objeto.descripcion}</td>
-                    <td>${objeto.lugar}</td>
-                    <td>${objeto.fecha}</td>
+                    <td><strong>#${obj.codigo}</strong></td>
                     <td>
-                        <span style="font-size: 0.85rem; font-weight: bold; padding: 4px 8px; border-radius: 4px; background: ${bgEstado}; color: ${colorEstado};">
-                            ${objeto.estado}
-                        </span>
+                        <img src="${obj.ruta_foto || 'https://via.placeholder.com/40?text=Foto'}" 
+                             alt="Foto #${obj.codigo}" 
+                             class="img-miniatura-zoom">
                     </td>
+                    <td><span class="tag-category">${obj.clasificacion}</span></td>
+                    <td>${obj.descripcion}</td>
+                    <td>${obj.lugar_hallazgo}</td>
+                    <td>${obj.fecha_hallazgo}</td>
+                    <td><span class="badge bg-success">${obj.estado_actual}</span></td>
                     <td>
-                        ${objeto.estado === 'Activo' ? 
-                            `<button class="btn-sm btn-edit" title="Editar">✏️</button>
-                             <button class="btn-sm btn-baja" onclick="abrirBaja(${objeto.codigo})" title="Procesar Baja o Reclamo">Dar de Baja</button>` 
-                            : '<span class="text-muted" style="font-size: 0.85rem;">Procesado</span>'
-                        }
+                        <button class="btn-sm btn-baja" onclick="abrirBaja(${obj.codigo})">Procesar Salida</button>
                     </td>
                 `;
                 tbody.appendChild(tr);
             });
+        } catch (error) {
+            console.error('Error al cargar inventario:', error);
+            tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color: red; padding: 1rem;">Error de conexión con el servidor backend.</td></tr>`;
         }
+    }
 
-        // Sensores de búsqueda en tiempo real
-        document.getElementById('buscadorCodigo').addEventListener('input', cargarTablaAdmin);
-        document.getElementById('filtroEstado').addEventListener('change', cargarTablaAdmin);
+    // Event listener para búsqueda en tiempo real
+    const inputBuscador = document.getElementById('buscadorCodigo');
+    if (inputBuscador) {
+        inputBuscador.addEventListener('input', cargarTablaRegistro);
+    }
 
-        // ==========================================
-        // 3. Lógica del Modal (Subir Elemento)
-        // ==========================================
-        const modalCarga = document.getElementById('modalCarga');
-        const formSubir = document.getElementById('formSubirElemento');
+    // Modales de Carga
+    function abrirModalCarga() {
+        const modal = document.getElementById('modalCarga');
+        if (modal) modal.style.display = 'flex';
+        const fechaInput = document.getElementById('fechaHallazgo');
+        if (fechaInput) fechaInput.valueAsDate = new Date();
+    }
 
-        function generarSiguienteCodigo() {
-            const inventario = JSON.parse(localStorage.getItem('ecos_inventario')) || [];
-            return inventario.length > 0 ? Math.max(...inventario.map(i => i.codigo)) + 1 : 1001;
-        }
+    function cerrarModalCarga() {
+        const modal = document.getElementById('modalCarga');
+        if (modal) modal.style.display = 'none';
+        const form = document.getElementById('formSubirElemento');
+        if (form) form.reset();
+    }
 
-        function abrirModalCarga() {
-            document.getElementById('codigoGenerado').innerText = "#" + generarSiguienteCodigo();
-            document.getElementById('fechaHallazgo').valueAsDate = new Date(); 
-            modalCarga.style.display = 'flex';
-        }
+    // Modales y Procesamiento de Salida / Baja
+    function abrirBaja(codigo) {
+        const elemVis = document.getElementById('bajaCodigoVisible');
+        const elemVal = document.getElementById('bajaCodigoElemento');
+        if (elemVis) elemVis.innerText = "#" + codigo;
+        if (elemVal) elemVal.value = codigo;
 
-        function cerrarModalCarga() {
-            modalCarga.style.display = 'none';
-            formSubir.reset();
-        }
+        const ahora = new Date();
+        const fechaInput = document.getElementById('bajaFecha');
+        const horaInput = document.getElementById('bajaHora');
 
-        function guardarElemento(event) {
-            event.preventDefault();
-            
-            const archivoFoto = document.getElementById('fotoElemento').files[0];
-            const reader = new FileReader();
+        if (fechaInput) fechaInput.valueAsDate = ahora;
+        if (horaInput) horaInput.value = `${String(ahora.getHours()).padStart(2, '0')}:${String(ahora.getMinutes()).padStart(2, '0')}`;
 
-            reader.onload = function(e) {
-                const nuevoObjeto = {
-                    codigo: generarSiguienteCodigo(),
-                    fecha: document.getElementById('fechaHallazgo').value,
-                    lugar: document.getElementById('lugarHallazgo').value,
-                    clasificacion: document.getElementById('clasificacion').value,
-                    descripcion: document.getElementById('descripcion').value,
-                    fotoBase64: e.target.result,
-                    estado: 'Activo'
-                };
+        const modal = document.getElementById('modalBaja');
+        if (modal) modal.style.display = 'flex';
+    }
 
-                const inventario = JSON.parse(localStorage.getItem('ecos_inventario')) || [];
-                inventario.unshift(nuevoObjeto);
-                localStorage.setItem('ecos_inventario', JSON.stringify(inventario));
+    function cerrarModalBaja() {
+        const modal = document.getElementById('modalBaja');
+        if (modal) modal.style.display = 'none';
+        const form = document.getElementById('formBaja');
+        if (form) form.reset();
+    }
 
-                alert('Objeto #' + nuevoObjeto.codigo + ' registrado exitosamente.');
-                cerrarModalCarga();
-                cargarTablaAdmin();
-            };
-            
-            if(archivoFoto) { 
-                reader.readAsDataURL(archivoFoto); 
-            } else {
-                reader.onload({target: {result: ""}});
-            }
-        }
+    async function guardarBaja(event) {
+        event.preventDefault();
 
-        // ==========================================
-        // Lógica del Modal (Salida / Dar de Baja)
-        // ==========================================
-        const modalBaja = document.getElementById('modalBaja');
-        const formBaja = document.getElementById('formBaja');
-
-        function abrirBaja(codigo) {
-            document.getElementById('bajaCodigoVisible').innerText = "#" + codigo;
-            document.getElementById('bajaCodigoElemento').value = codigo;
-            const ahora = new Date();
-            document.getElementById('bajaFecha').valueAsDate = ahora;
-            document.getElementById('bajaHora').value = `${String(ahora.getHours()).padStart(2, '0')}:${String(ahora.getMinutes()).padStart(2, '0')}`;
-            // Limpiamos el campo del funcionario por seguridad en cada nueva apertura
-            document.getElementById('bajaFuncionario').value = '';
-            modalBaja.style.display = 'flex';
-        }
-
-        function cerrarModalBaja() { 
-            modalBaja.style.display = 'none'; 
-            document.getElementById('formBaja').reset(); 
-        }
-
-        function guardarBaja(event) {
-            event.preventDefault();
-            const codigo = parseInt(document.getElementById('bajaCodigoElemento').value);
-            let inv = JSON.parse(localStorage.getItem('ecos_inventario')) || [];
-            const idx = inv.findIndex(obj => obj.codigo === codigo);
-            
-            if (idx !== -1) {
-                inv[idx].estado = document.getElementById('bajaEstado').value;
-                inv[idx].fechaSalida = document.getElementById('bajaFecha').value;
-                inv[idx].horaSalida = document.getElementById('bajaHora').value;
-                inv[idx].categoriaRetira = document.getElementById('bajaCategoria').value;
-                inv[idx].nombreRetira = document.getElementById('bajaNombre').value;
-                // NUEVO: Capturamos al funcionario responsable
-                inv[idx].funcionarioResponsable = document.getElementById('bajaFuncionario').value;
-                
-                localStorage.setItem('ecos_inventario', JSON.stringify(inv));
-                cerrarModalBaja(); 
-                cargarTablaAdmin();
-            }
-        }
-
-        // ==========================================
-        // 4. Arranque del Sistema
-        // ==========================================
-        window.onload = function() {
-            inicializarBaseDatos();
-            cargarTablaAdmin();
+        const datosBaja = {
+            codigo_objeto: parseInt(document.getElementById('bajaCodigoElemento').value),
+            tipo_salida: document.getElementById('bajaEstado').value,
+            fecha_salida: document.getElementById('bajaFecha').value,
+            hora_salida: document.getElementById('bajaHora').value,
+            categoria_retira: document.getElementById('bajaCategoria').value,
+            nombre_retira: document.getElementById('bajaNombre').value,
+            id_funcionario: usuarioActivo.id_usuario // Trazabilidad automática con la sesión del funcionario
         };
+
+        try {
+            const response = await fetch('http://127.0.0.1:8000/api/objetos/baja', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(datosBaja)
+            });
+
+            if (!response.ok) throw new Error('Error al registrar la salida en el servidor');
+
+            const resultado = await response.json();
+            alert(resultado.mensaje);
+
+            cerrarModalBaja();
+            cargarTablaRegistro();
+        } catch (error) {
+            alert(`Error: ${error.message}`);
+        }
+    }
+
+    window.onload = function() {
+        cargarTablaRegistro();
+    };
     </script>
     
 </body>

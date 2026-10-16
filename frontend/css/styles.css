@@ -524,3 +524,26 @@ body {
 .btn-close:hover {
     color: #d93025;
 }
+
+/* ==========================================================
+   Ecosistema ECO-S: Animación e Identificación Espacial
+   Efecto Hover Zoom para miniaturas de objetos recuperados
+   ========================================================== */
+
+.img-miniatura-zoom {
+    width: 40px;
+    height: 40px;
+    border-radius: 4px;
+    object-fit: cover;
+    transition: transform 0.25s ease-in-out, box-shadow 0.25s ease-in-out;
+    cursor: zoom-in;
+}
+
+/* Ampliación focalizada al pasar el cursor */
+.img-miniatura-zoom:hover {
+    transform: scale(4.5);
+    position: relative;
+    z-index: 1050; /* Garantiza que sobrepase la capa de la tabla */
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35);
+    border-radius: 6px;
+}
