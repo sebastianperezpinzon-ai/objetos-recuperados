@@ -191,47 +191,42 @@
         }
 
         async function procesarReclamo(event) {
-            event.preventDefault();
+    event.preventDefault();
 
-            const codigoObjeto = parseInt(document.getElementById('reclamoCodigoElemento').value);
-            const nombreSolicitante = document.getElementById('reclamoNombre').value.trim();
-            const correoInstitucional = document.getElementById('reclamoCorreo').value.trim();
-            
-            const ahora = new Date();
-            const fechaSalida = ahora.toISOString().split('T')[0];
-            const horaSalida = `${String(ahora.getHours()).padStart(2, '0')}:${String(ahora.getMinutes()).padStart(2, '0')}`;
+    const codigoObjeto = parseInt(document.getElementById('reclamoCodigoElemento').value);
+    const nombreSolicitante = document.getElementById('reclamoNombre').value.trim();
+    const correoInstitucional = document.getElementById('reclamoCorreo').value.trim();
+    const telefonoContacto = document.getElementById('reclamoContacto').value.trim();
 
-            const payload = {
-                codigo_objeto: codigoObjeto,
-                tipo_salida: "Reclamado",
-                fecha_salida: fechaSalida,
-                hora_salida: horaSalida,
-                categoria_retira: "Estudiante",
-                nombre_retira: nombreSolicitante,
-                id_funcionario: 1, // ID reservado para solicitudes automáticas públicas
-                correo_notificacion: correoInstitucional
-            };
+    const payload = {
+        codigo_objeto: codigoObjeto,
+        nombre_solicitante: nombreSolicitante,
+        correo_institucional: correoInstitucional,
+        telefono_contacto: telefonoContacto
+    };
 
-            try {
-                const response = await fetch('http://127.0.0.1:8000/api/objetos/baja', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
+    try {
+        const response = await fetch('http://127.0.0.1:8000/api/objetos/solicitar-reclamo', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
 
-                if (!response.ok) throw new Error('Error al enviar la solicitud de reclamación');
-
-                const resultado = await response.json();
-                
-                alert(`¡Solicitud enviada exitosamente, ${nombreSolicitante}!\n\nSe ha enviado un correo automático con las instrucciones a:\n${correoInstitucional}\n\nCon copia a Logística y Seguridad para coordinar la entrega en el Sótano 1.`);
-
-                cerrarModalReclamo();
-                cargarObjetosDesdeAPI(); // Recargar el catálogo para ocultar el objeto entregado
-            } catch (error) {
-                console.error("Error al procesar el reclamo:", error);
-                alert("Hubo un problema al procesar tu solicitud. Por favor acércate directamente a la central de seguridad en el Sótano 1.");
-            }
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.detail || 'Error al enviar la solicitud');
         }
+
+        alert(`¡Solicitud enviada exitosamente, ${nombreSolicitante}!\n\nRevisa tu correo (${correoInstitucional}) donde recibirás las indicaciones para acercarte al Sótano 1.\n\nEl equipo de Logística y Seguridad ya ha sido notificado con copia.`);
+
+        cerrarModalReclamo();
+        // NOTA ECO-S: El objeto se mantiene activo en el catálogo público
+        // hasta que el funcionario procese la entrega física desde la interfaz administrativa.
+    } catch (error) {
+        console.error("Error al procesar la solicitud:", error);
+        alert(`Hubo un problema al enviar tu solicitud: ${error.message}`);
+    }
+}
 
         // Inicialización
         window.onload = function() {
