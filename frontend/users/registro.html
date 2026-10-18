@@ -203,7 +203,7 @@
         };
 
         try {
-            const response = await fetch('http://127.0.0.1:8000/api/objetos', {
+            const response = await fetch('https://objetos-recuperadosean.onrender.com/api/objetos', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(nuevoObjeto)
@@ -227,7 +227,7 @@
         if (!tbody) return;
 
         try {
-            const response = await fetch('http://127.0.0.1:8000/api/objetos');
+            const response = await fetch('https://objetos-recuperadosean.onrender.com/api/objetos');
             if (!response.ok) throw new Error('Error de conexión');
 
             objetosInventario = await response.json();
@@ -354,7 +354,7 @@
         };
 
         try {
-            const response = await fetch('http://127.0.0.1:8000/api/objetos/baja', {
+            const response = await fetch('https://objetos-recuperadosean.onrender.com/api/objetos/baja', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(datosBaja)
