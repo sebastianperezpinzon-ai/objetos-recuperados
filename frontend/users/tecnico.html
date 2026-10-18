@@ -14,6 +14,7 @@
         <nav class="sidebar">
             <h2>Técnico ECO-S</h2>
             <a href="#" class="nav-link active">Inventario Activo</a>
+            <a href="#" class="nav-link" onclick="descargarReporteExcel()">Reportes (Excel)</a>
             <a href="login.html" class="nav-link btn-logout">Cerrar Sesión</a>
         </nav>
 
@@ -158,6 +159,9 @@
             </form>
         </div>
     </div>
+
+    <!-- Librería para Excel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
     <script>
     // Validar sesión activa del usuario Técnico
@@ -371,6 +375,38 @@
         } catch (error) {
             alert(`Error: ${error.message}`);
         }
+    }
+
+    // ==========================================
+    // EXPORTACIÓN DE DATOS A EXCEL (SheetJS)
+    // ==========================================
+    function descargarReporteExcel() {
+        if (objetosInventario.length === 0) return alert("No hay datos cargados para exportar.");
+        
+        const datos = objetosInventario.map(obj => ({
+            "Código": `#${obj.codigo}`, 
+            "Fecha Hallazgo": obj.fecha_hallazgo, 
+            "Lugar del Hallazgo": obj.lugar_hallazgo, 
+            "Clasificación": obj.clasificacion,
+            "Descripción": obj.descripcion, 
+            "Estado Actual": obj.estado_actual,
+            "Funcionario que procesa la salida": obj.funcionario_procesa || obj.nombre_funcionario || (obj.estado_actual === 'Activo' ? 'N/A (En Custodia)' : 'Sin Registro')
+        }));
+        
+        const ws = XLSX.utils.json_to_sheet(datos);
+        ws['!cols'] = [
+            {wch: 12}, // Código
+            {wch: 15}, // Fecha Hallazgo
+            {wch: 25}, // Lugar del Hallazgo
+            {wch: 15}, // Clasificación
+            {wch: 35}, // Descripción
+            {wch: 15}, // Estado Actual
+            {wch: 35}  // Funcionario que procesa la salida
+        ];
+        
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Inventario_ECO-S");
+        XLSX.writeFile(wb, `ECO-S_Reporte_Tecnico_${new Date().toISOString().split('T')[0]}.xlsx`);
     }
 
     window.onload = function() {

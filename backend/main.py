@@ -176,6 +176,48 @@ def solicitar_reclamo_publico(solicitud: SolicitudReclamoPublica, background_tas
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al procesar la solicitud pública: {str(e)}")
 
+    # Modelo para la solicitud pública desde index.html
+class SolicitudReclamoPublica(BaseModel):
+    codigo_objeto: int
+    nombre_solicitante: str
+    correo_institucional: str
+    telefono_contacto: Optional[str] = None
+
+@app.post("/api/objetos/solicitar-reclamo", tags=["Público"])
+def solicitar_reclamo_publico(solicitud: SolicitudReclamoPublica, background_tasks: BackgroundTasks):
+    try:
+        # 1. Verificar existencia y estado del objeto en Supabase
+        res = supabase.table("objetos").select("*").eq("codigo", solicitud.codigo_objeto).execute()
+        
+        if not res.data:
+            raise HTTPException(status_code=404, detail="El objeto no existe en el catálogo.")
+        
+        objeto = res.data[0]
+        if objeto.get("estado_actual") != "Activo":
+            raise HTTPException(status_code=400, detail="El objeto ya no se encuentra activo.")
+
+        # 2. Empaquetar datos para la notificación por correo
+        datos_correo = {
+            "codigo_objeto": solicitud.codigo_objeto,
+            "nombre_retira": solicitud.nombre_solicitante
+        }
+
+        # 3. Disparar correo asíncrono vía Office 365 (Solicitante + Logística + Seguridad)
+        background_tasks.add_task(
+            enviar_correo_solicitud_reclamo,
+            destinatario_solicitante=solicitud.correo_institucional,
+            datos_baja=datos_correo
+        )
+
+        return {
+            "status": "success",
+            "mensaje": f"Solicitud para el objeto #{solicitud.codigo_objeto} procesada correctamente."
+        }
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al procesar la solicitud: {str(e)}")
+
 # ------------------------------------------
 # INVENTARIO Y OBJETOS
 # ------------------------------------------

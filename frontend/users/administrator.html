@@ -51,7 +51,7 @@
                 
                 <!-- Barra de Filtros Administrativos -->
                 <div class="filters-bar" style="margin-bottom: 1.5rem; background: var(--white); padding: 1rem; border-radius: 8px; box-shadow: var(--shadow-sm);">
-                    <input type="text" id="buscadorCodigo" class="form-control" placeholder="🔍 Buscar por código (Ej: 1001)">
+                    <input type="text" id="buscadorCodigo" class="form-control" placeholder="🔍 Buscar por código (Ej: 1001)" autocomplete="off">
                     <select id="filtroEstado" class="form-control">
                         <option value="Activo">Mostrar solo Activos</option>
                         <option value="Todos">Mostrar Todos (Histórico completo)</option>
@@ -90,7 +90,7 @@
                 </div>
 
                 <div class="alert-info">
-                    <p><strong>Privacidad y Seguridad:</strong> Asigne roles estrictamente según la necesidad operativa. El rol <em>Registro</em> es ideal para el equipo de logística en central (Sótano 1).</p>
+                    <p><strong>Privacidad y Seguridad:</strong> Asigne roles strictly según la necesidad operativa. El rol <em>Registro</em> es ideal para el equipo de logística en central (Sótano 1).</p>
                 </div>
 
                 <div class="table-container">
@@ -117,37 +117,41 @@
     
     <!-- Modal: Subir Elemento -->
     <div id="modalCarga" class="modal-overlay">
-        <!-- (Mismo contenido del modalCarga anterior...) -->
         <div class="modal-content">
             <div class="modal-header">
                 <h3>Registrar Objeto Recuperado</h3>
                 <button class="btn-close" onclick="cerrarModalCarga()">×</button>
             </div>
-            <form id="formSubirElemento" onsubmit="guardarElemento(event)">
-                <p class="text-muted" style="margin-top: 0;">Código asignado: <strong id="codigoGenerado"></strong></p>
+            <form id="formSubirElemento" onsubmit="guardarElemento(event)" autocomplete="off">
+                <p class="text-muted" style="margin-top: 0;">Código asignado: <strong id="codigoGenerado">--</strong></p>
                 <div class="form-group"><label>Fecha *</label><input type="date" id="fechaHallazgo" class="form-control" required></div>
-                <div class="form-group"><label>Lugar exacto *</label><input type="text" id="lugarHallazgo" class="form-control" required></div>
+                <div class="form-group"><label>Lugar exacto *</label><input type="text" id="lugarHallazgo" class="form-control" required placeholder="Ej: Sótano 2, parqueadero"></div>
                 <div class="form-group">
                     <label>Clasificación *</label>
                     <select id="clasificacion" class="form-control" required>
-                        <option value="">Seleccione...</option><option value="Accesorio">Accesorio</option><option value="Tecnología">Tecnología</option><option value="Ropa">Ropa</option><option value="Otros">Otros</option>
+                        <option value="">Seleccione...</option>
+                        <option value="Accesorio">Accesorio</option>
+                        <option value="Joyería">Joyería</option>
+                        <option value="Tecnología">Tecnología</option>
+                        <option value="Ropa">Ropa</option>
+                        <option value="Otros">Otros</option>
                     </select>
                 </div>
-                <div class="form-group"><label>Descripción *</label><input type="text" id="descripcion" class="form-control" required></div>
+                <div class="form-group"><label>Descripción *</label><input type="text" id="descripcion" class="form-control" required placeholder="Color, marca, detalles"></div>
                 <div class="form-group"><label>Foto *</label><input type="file" id="fotoElemento" class="form-control" accept="image/*" required></div>
                 <button type="submit" class="btn-primary btn-block">Guardar Objeto</button>
             </form>
         </div>
     </div>
 
-    <!-- Modal: Dar de Baja -->
+    <!-- Modal: Dar de Baja / Procesar Salida -->
     <div id="modalBaja" class="modal-overlay">
         <div class="modal-content">
             <div class="modal-header">
                 <h3>Procesar Salida</h3>
                 <button class="btn-close" onclick="cerrarModalBaja()">×</button>
             </div>
-            <form id="formBaja" onsubmit="guardarBaja(event)">
+            <form id="formBaja" onsubmit="guardarBaja(event)" autocomplete="off">
                 <p class="text-muted">Procesando código: <strong id="bajaCodigoVisible"></strong></p>
                 <input type="hidden" id="bajaCodigoElemento">
                 
@@ -176,16 +180,16 @@
                 
                 <div class="form-group">
                     <label>Nombre a quien se entrega o retira *</label>
-                    <input type="text" id="bajaNombre" class="form-control" required placeholder="Ej: Juan Pérez">
+                    <input type="text" id="bajaNombre" class="form-control" required placeholder="Ej: Juan Pérez" autocomplete="off">
                 </div>
 
-                <!-- NUEVO CAMPO: Trazabilidad Operativa -->
+                <!-- Campo manual obligatorio para firmas por turno -->
                 <div class="form-group" style="border-top: 1px dashed #ccc; padding-top: 1rem; margin-top: 1rem;">
-                    <label style="color: var(--primary-color);">Funcionario que procesa la salida (Responsable) *</label>
-                    <input type="text" id="bajaFuncionario" class="form-control" required placeholder="Nombre del colaborador en turno">
+                    <label style="color: var(--primary-color, #005A43); font-weight: bold;">Funcionario que procesa la salida (Responsable en turno) *</label>
+                    <input type="text" id="bajaFuncionario" class="form-control" required placeholder="Nombre del colaborador en turno" autocomplete="new-password">
                 </div>
 
-                <button type="submit" class="btn-primary btn-block" style="background-color: #d93025;">Confirmar Salida</button>
+                <button type="submit" class="btn-primary btn-block" style="background-color: #d93025; margin-top: 1rem;">Confirmar Salida</button>
             </form>
         </div>
     </div>
@@ -197,14 +201,14 @@
                 <h3>Crear Nuevo Usuario</h3>
                 <button class="btn-close" onclick="cerrarModalUsuario()">×</button>
             </div>
-            <form id="formCrearUsuario" onsubmit="guardarUsuario(event)">
+            <form id="formCrearUsuario" onsubmit="guardarUsuario(event)" autocomplete="off">
                 <div class="form-group">
                     <label>Correo Institucional *</label>
-                    <input type="email" id="nuevoCorreo" class="form-control" required placeholder="usuario@institucion.edu.co">
+                    <input type="email" id="nuevoCorreo" class="form-control" required placeholder="usuario@institucion.edu.co" autocomplete="off">
                 </div>
                 <div class="form-group">
                     <label>Contraseña Alfanumérica *</label>
-                    <input type="password" id="nuevaContrasena" class="form-control" required minlength="6">
+                    <input type="password" id="nuevaContrasena" class="form-control" required minlength="6" autocomplete="new-password">
                 </div>
                 <div class="form-group">
                     <label>Rol asignado *</label>
@@ -275,7 +279,6 @@
         if (!tbody) return;
 
         try {
-            // Petición GET al servidor FastAPI
             const response = await fetch('http://127.0.0.1:8000/api/objetos');
             if (!response.ok) throw new Error('Error al consultar la base de datos');
             
@@ -306,7 +309,7 @@
                 
                 tr.innerHTML = `
                     <td><strong>#${objeto.codigo}</strong></td>
-                    <td><img src="${objeto.ruta_foto || 'https://via.placeholder.com/40?text=Foto'}"alt="Objeto #${objeto.codigo}"class="img-miniatura-zoom"></td>
+                    <td><img src="${objeto.ruta_foto || 'https://via.placeholder.com/40?text=Foto'}" alt="Objeto #${objeto.codigo}" class="img-miniatura-zoom"></td>
                     <td><span class="tag-category">${objeto.clasificacion}</span></td>
                     <td>${objeto.descripcion}</td>
                     <td>${objeto.lugar_hallazgo}</td>
@@ -351,69 +354,65 @@
         if (form) form.reset(); 
     }
 
-    // Registrar objeto en Supabase a través de FastAPI
-    // Función auxiliar para convertir un archivo de imagen a texto Base64
-function convertirImagenABase64(archivo) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(archivo);
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = error => reject(error);
-    });
-}
+    function convertirImagenABase64(archivo) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(archivo);
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = error => reject(error);
+        });
+    }
 
-// Función principal para registrar el objeto en Supabase a través de FastAPI
-async function guardarElemento(event) {
-    event.preventDefault();
+    async function guardarElemento(event) {
+        event.preventDefault();
 
-    // 1. Obtener la referencia al archivo seleccionado en el input de tipo file
-    const inputFoto = document.getElementById('fotoElemento') || document.getElementById('fotoObjeto');
-    const archivo = inputFoto && inputFoto.files ? inputFoto.files[0] : null;
+        const inputFoto = document.getElementById('fotoElemento') || document.getElementById('fotoObjeto');
+        const archivo = inputFoto && inputFoto.files ? inputFoto.files[0] : null;
 
-    let cadenaBase64 = null;
+        let cadenaBase64 = null;
 
-    // 2. Convertir la imagen a Base64 si el usuario seleccionó un archivo
-    if (archivo) {
+        if (archivo) {
+            try {
+                cadenaBase64 = await convertirImagenABase64(archivo);
+            } catch (error) {
+                console.error('Error al procesar la imagen:', error);
+                alert('No se pudo procesar la imagen seleccionada.');
+                return;
+            }
+        }
+
+        const nuevoObjeto = {
+            fecha_hallazgo: document.getElementById('fechaHallazgo').value,
+            lugar_hallazgo: document.getElementById('lugarHallazgo').value,
+            clasificacion: document.getElementById('clasificacion').value,
+            descripcion: document.getElementById('descripcion').value,
+            ruta_foto: cadenaBase64
+        };
+
         try {
-            cadenaBase64 = await convertirImagenABase64(archivo);
+            const response = await fetch('http://127.0.0.1:8000/api/objetos', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(nuevoObjeto)
+            });
+
+            if (!response.ok) throw new Error('Error al registrar el objeto en el servidor');
+
+            const resultado = await response.json();
+            alert(`Objeto #${resultado.data.codigo} registrado exitosamente en la nube.`);
+            
+            cerrarModalCarga(); 
+            cargarTablaAdmin();
         } catch (error) {
-            console.error('Error al procesar la imagen:', error);
-            alert('No se pudo procesar la imagen seleccionada.');
-            return;
+            alert(`Error: ${error.message}`);
         }
     }
 
-    // 3. Construir la estructura del objeto a enviar
-    const nuevoObjeto = {
-        fecha_hallazgo: document.getElementById('fechaHallazgo').value,
-        lugar_hallazgo: document.getElementById('lugarHallazgo').value,
-        clasificacion: document.getElementById('clasificacion').value,
-        descripcion: document.getElementById('descripcion').value,
-        ruta_foto: cadenaBase64 // Guarda la cadena 'data:image/...;base64,...' o null
-    };
-
-    try {
-        // 4. Enviar los datos mediante POST a la API REST de FastAPI
-        const response = await fetch('http://127.0.0.1:8000/api/objetos', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(nuevoObjeto)
-        });
-
-        if (!response.ok) throw new Error('Error al registrar el objeto en el servidor');
-
-        const resultado = await response.json();
-        alert(`Objeto #${resultado.data.codigo} registrado exitosamente en la nube.`);
-        
-        cerrarModalCarga(); 
-        cargarTablaAdmin();
-    } catch (error) {
-        alert(`Error: ${error.message}`);
-    }
-}
-
     // Modal de Baja / Salida
     function abrirBaja(codigo) {
+        const form = document.getElementById('formBaja');
+        if (form) form.reset();
+
         const elemVis = document.getElementById('bajaCodigoVisible');
         const elemVal = document.getElementById('bajaCodigoElemento');
         if (elemVis) elemVis.innerText = "#" + codigo;
@@ -426,6 +425,10 @@ async function guardarElemento(event) {
         if (fechaSalida) fechaSalida.valueAsDate = ahora;
         if (horaSalida) horaSalida.value = `${String(ahora.getHours()).padStart(2, '0')}:${String(ahora.getMinutes()).padStart(2, '0')}`;
         
+        // Limpiar explícitamente el campo del funcionario en turno
+        const inputFuncionario = document.getElementById('bajaFuncionario');
+        if (inputFuncionario) inputFuncionario.value = '';
+
         if (modalBaja) modalBaja.style.display = 'flex';
     }
 
@@ -435,9 +438,15 @@ async function guardarElemento(event) {
         if (form) form.reset(); 
     }
 
-    // Procesar Baja o Reclamo en Supabase
+    // Procesar Salida en Supabase
     async function guardarBaja(event) {
         event.preventDefault();
+
+        const funcionarioTurno = document.getElementById('bajaFuncionario').value.trim();
+        if (!funcionarioTurno) {
+            alert("Por favor ingrese el nombre del funcionario responsable del turno.");
+            return;
+        }
 
         const datosBaja = {
             codigo_objeto: parseInt(document.getElementById('bajaCodigoElemento').value),
@@ -446,7 +455,7 @@ async function guardarElemento(event) {
             hora_salida: document.getElementById('bajaHora').value,
             categoria_retira: document.getElementById('bajaCategoria').value,
             nombre_retira: document.getElementById('bajaNombre').value,
-            id_funcionario: usuarioActivo.id_usuario // Firma automática del funcionario logueado
+            id_funcionario: usuarioActivo.id_usuario
         };
 
         try {
@@ -467,25 +476,36 @@ async function guardarElemento(event) {
         }
     }
 
-    // Exportación de datos desde la API a Excel
+    // ==========================================
+    // EXPORTACIÓN DE DATOS A EXCEL (SheetJS)
+    // ==========================================
     function descargarReporteExcel() {
         if (objetosInventario.length === 0) return alert("No hay datos cargados para exportar.");
         
         const datos = objetosInventario.map(obj => ({
-            "Código": obj.codigo, 
+            "Código": `#${obj.codigo}`, 
             "Fecha Hallazgo": obj.fecha_hallazgo, 
-            "Lugar": obj.lugar_hallazgo, 
+            "Lugar del Hallazgo": obj.lugar_hallazgo, 
             "Clasificación": obj.clasificacion,
             "Descripción": obj.descripcion, 
-            "Estado": obj.estado_actual
+            "Estado Actual": obj.estado_actual,
+            "Funcionario que procesa la salida": obj.funcionario_procesa || obj.nombre_funcionario || (obj.estado_actual === 'Activo' ? 'N/A (En Custodia)' : 'Sin Registro')
         }));
         
         const ws = XLSX.utils.json_to_sheet(datos);
-        ws['!cols'] = [{wch:10}, {wch:15}, {wch:30}, {wch:15}, {wch:40}, {wch:15}];
+        ws['!cols'] = [
+            {wch: 12}, // Código
+            {wch: 15}, // Fecha Hallazgo
+            {wch: 25}, // Lugar del Hallazgo
+            {wch: 15}, // Clasificación
+            {wch: 35}, // Descripción
+            {wch: 15}, // Estado Actual
+            {wch: 35}  // Funcionario que procesa la salida
+        ];
         
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Inventario_ECO-S");
-        XLSX.writeFile(wb, `ECO-S_Inventario_${new Date().toISOString().split('T')[0]}.xlsx`);
+        XLSX.writeFile(wb, `ECO-S_Reporte_Inventario_${new Date().toISOString().split('T')[0]}.xlsx`);
     }
 
     // ==========================================
@@ -500,7 +520,6 @@ async function guardarElemento(event) {
         const tbody = document.getElementById('cuerpoTablaUsuarios');
         if (!tbody) return;
         
-        // Muestra de usuario autenticado activo
         tbody.innerHTML = `
             <tr>
                 <td>${usuarioActivo.id_usuario}</td>

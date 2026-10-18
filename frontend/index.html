@@ -214,14 +214,12 @@
 
         if (!response.ok) {
             const errorData = await response.json();
-            throw new Error(errorData.detail || 'Error al enviar la solicitud');
+            throw new Error(errorData.detail || 'Error al procesar la solicitud');
         }
 
-        alert(`¡Solicitud enviada exitosamente, ${nombreSolicitante}!\n\nRevisa tu correo (${correoInstitucional}) donde recibirás las indicaciones para acercarte al Sótano 1.\n\nEl equipo de Logística y Seguridad ya ha sido notificado con copia.`);
+        alert(`¡Solicitud enviada exitosamente, ${nombreSolicitante}!\n\nRevisa tu correo (${correoInstitucional}) con las instrucciones para acercarte al Sótano 1.\n\nLogística y Seguridad han sido notificados.`);
 
         cerrarModalReclamo();
-        // NOTA ECO-S: El objeto se mantiene activo en el catálogo público
-        // hasta que el funcionario procese la entrega física desde la interfaz administrativa.
     } catch (error) {
         console.error("Error al procesar la solicitud:", error);
         alert(`Hubo un problema al enviar tu solicitud: ${error.message}`);
