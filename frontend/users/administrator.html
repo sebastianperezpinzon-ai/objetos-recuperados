@@ -90,7 +90,7 @@
                 </div>
 
                 <div class="alert-info">
-                    <p><strong>Privacidad y Seguridad:</strong> Asigne roles strictly según la necesidad operativa. El rol <em>Registro</em> es ideal para el equipo de logística en central (Sótano 1).</p>
+                    <p><strong>Privacidad y Seguridad:</strong> Asigne roles estrictamente según la necesidad operativa. El rol <em>Registro</em> es ideal para el equipo de logística en central (Sótano 1).</p>
                 </div>
 
                 <div class="table-container">
@@ -513,21 +513,96 @@
     // ==========================================
     const modalUsuario = document.getElementById('modalUsuario');
 
-    function abrirModalUsuario() { if (modalUsuario) modalUsuario.style.display = 'flex'; }
-    function cerrarModalUsuario() { if (modalUsuario) modalUsuario.style.display = 'none'; }
+    function abrirModalUsuario() { 
+        if (modalUsuario) modalUsuario.style.display = 'flex'; 
+    }
+    
+    function cerrarModalUsuario() { 
+        if (modalUsuario) modalUsuario.style.display = 'none'; 
+        const form = document.getElementById('formCrearUsuario');
+        if (form) form.reset();
+    }
 
-    function cargarTablaUsuarios() {
+    // Registrar nuevo usuario en Supabase a través de Render
+    async function guardarUsuario(event) {
+        event.preventDefault();
+
+        const correo = document.getElementById('nuevoCorreo').value.trim();
+        const contrasena = document.getElementById('nuevaContrasena').value.trim();
+        const rol = document.getElementById('nuevoRol').value;
+
+        if (!correo || !contrasena || !rol) {
+            alert("Por favor complete todos los campos obligatorios.");
+            return;
+        }
+
+        const payload = {
+            correo: correo,
+            contrasena: contrasena,
+            rol: rol
+        };
+
+        try {
+            const response = await fetch('https://objetos-recuperadosean.onrender.com/api/usuarios', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.detail || 'Error al registrar el usuario en el servidor');
+            }
+
+            const resultado = await response.json();
+            alert(`Usuario ${correo} creado exitosamente con el rol ${rol}.`);
+
+            cerrarModalUsuario();
+            cargarTablaUsuarios(); // Actualizar la tabla en tiempo real
+        } catch (error) {
+            console.error("Error al registrar usuario:", error);
+            alert(`Error: ${error.message}`);
+        }
+    }
+
+    // Cargar la lista completa de usuarios desde la API
+    async function cargarTablaUsuarios() {
         const tbody = document.getElementById('cuerpoTablaUsuarios');
         if (!tbody) return;
-        
-        tbody.innerHTML = `
-            <tr>
-                <td>${usuarioActivo.id_usuario}</td>
-                <td><strong>${usuarioActivo.correo}</strong></td>
-                <td><span class="tag-category">${usuarioActivo.rol}</span></td>
-                <td><span class="text-muted" style="font-size: 0.85rem;">Sesión Actual (Protegido)</span></td>
-            </tr>
-        `;
+
+        try {
+            const response = await fetch('https://objetos-recuperadosean.onrender.com/api/usuarios');
+            if (!response.ok) throw new Error('Error al consultar usuarios en la base de datos');
+
+            const usuarios = await response.json();
+            tbody.innerHTML = '';
+
+            if (!usuarios || usuarios.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding: 1.5rem; color: #6C757D;">No hay usuarios registrados en la base de datos.</td></tr>`;
+                return;
+            }
+
+            usuarios.forEach(user => {
+                const tr = document.createElement('tr');
+                const esSesionActual = user.id_usuario === usuarioActivo?.id_usuario || user.correo === usuarioActivo?.correo;
+
+                tr.innerHTML = `
+                    <td>${user.id_usuario || '--'}</td>
+                    <td><strong>${user.correo}</strong></td>
+                    <td><span class="tag-category">${user.rol}</span></td>
+                    <td>
+                        ${esSesionActual ? 
+                            '<span class="text-muted" style="font-size: 0.85rem;">Sesión Actual (Protegido)</span>' : 
+                            '<span class="text-muted" style="font-size: 0.85rem;">Activo</span>'
+                        }
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        } catch (error) {
+            console.error('Error al cargar la tabla de usuarios:', error);
+            tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color: red; padding: 1rem;">Error de conexión al cargar usuarios desde el servidor.</td></tr>`;
+        }
     }
 
     // ==========================================
