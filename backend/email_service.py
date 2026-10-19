@@ -9,12 +9,12 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Configuración del servidor SMTP de Office 365
-SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.office365.com")
+# Configuración de variables de entorno con limpieza de espacios
+SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.office365.com").strip()
 SMTP_PORT = int(os.getenv("SMTP_PORT", 587))
 SMTP_USER = os.getenv("SMTP_USER", "").strip()
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "").strip()
-EMAIL_FROM_NAME = os.getenv("EMAIL_FROM_NAME", "ECO-S - Universidad EAN")
+EMAIL_FROM_NAME = os.getenv("EMAIL_FROM_NAME", "Logística y audiovisuales - Universidad EAN").strip()
 
 CORREOS_INSTITUCIONALES = [
     "logisyaudio@universidadean.edu.co",
@@ -22,13 +22,19 @@ CORREOS_INSTITUCIONALES = [
 ]
 
 def enviar_correo_solicitud_reclamo(destinatario_solicitante: str, datos_baja: dict):
+    """
+    Envía la notificación automática de reclamación a:
+    1. El correo ingresado por el solicitante.
+    2. logisyaudio@universidadean.edu.co
+    3. colviseg@universidadean.edu.co
+    """
     if not SMTP_USER or not SMTP_PASSWORD:
-        print("[ECO-S EMAIL O365] ERROR: Credenciales SMTP no configuradas.", flush=True)
+        print("[ECO-S EMAIL O365] ERROR: Credenciales SMTP no configuradas en el entorno.", flush=True)
         return
 
     destinatario_limpio = destinatario_solicitante.strip().lower() if destinatario_solicitante else ""
     if not destinatario_limpio:
-        print("[ECO-S EMAIL O365] ERROR: Correo destinatario inválido.", flush=True)
+        print("[ECO-S EMAIL O365] ERROR: Correo de destinatario no válido.", flush=True)
         return
 
     todos_los_destinatarios = list(set([destinatario_limpio] + [c.strip().lower() for c in CORREOS_INSTITUCIONALES]))
@@ -82,32 +88,29 @@ Muchas gracias."""
     mensaje.attach(MIMEText(cuerpo_texto, "plain", "utf-8"))
     mensaje.attach(MIMEText(cuerpo_html, "html", "utf-8"))
 
-    # PARCHE: Forzar resolución IPv4 para evitar "Network is unreachable" en Render
+    # Parche: Forzar resolución IPv4 para prevenir errores de enrutamiento en la red de Render
     original_getaddrinfo = socket.getaddrinfo
-
     def getaddrinfo_ipv4(host, port, family=0, type=0, proto=0, flags=0):
         return original_getaddrinfo(host, port, socket.AF_INET, type, proto, flags)
-
     socket.getaddrinfo = getaddrinfo_ipv4
 
     try:
-    print(f"[ECO-S EMAIL O365] Conectando a {SMTP_SERVER}:{SMTP_PORT}...", flush=True)
-    
-    if SMTP_PORT == 465:
-        server = smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT, timeout=15)
-    else:
-        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=15)
-        server.ehlo()
-        server.starttls()
-        server.ehlo()
+        print(f"[ECO-S EMAIL O365] Conectando a {SMTP_SERVER}:{SMTP_PORT}...", flush=True)
         
-    server.login(SMTP_USER, SMTP_PASSWORD)
-    server.sendmail(SMTP_USER, todos_los_destinatarios, mensaje.as_string())
-    server.quit()
-    print(f"[ECO-S EMAIL O365] Notificación enviada exitosamente a: {', '.join(todos_los_destinatarios)}", flush=True)
+        if SMTP_PORT == 465:
+            server = smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT, timeout=15)
+        else:
+            server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=15)
+            server.ehlo()
+            server.starttls()
+            server.ehlo()
+
+        server.login(SMTP_USER, SMTP_PASSWORD)
+        server.sendmail(SMTP_USER, todos_los_destinatarios, mensaje.as_string())
+        server.quit()
+        print(f"[ECO-S EMAIL O365] Notificación enviada exitosamente a: {', '.join(todos_los_destinatarios)}", flush=True)
     except Exception as e:
         print(f"[ECO-S EMAIL ERROR O365] Falló el envío del mensaje: {str(e)}", flush=True)
         print(f"[ECO-S EMAIL ERROR O365] Detalle técnico:\n{traceback.format_exc()}", flush=True)
     finally:
-        # Restaurar la resolución original del sistema
         socket.getaddrinfo = original_getaddrinfo
