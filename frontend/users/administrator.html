@@ -438,76 +438,81 @@
         if (form) form.reset(); 
     }
 
-    // Procesar Salida en Supabase
-    async function guardarBaja(event) {
-        event.preventDefault();
+   // Procesar Salida en Supabase enviando la firma del funcionario
+async function guardarBaja(event) {
+    event.preventDefault();
 
-        const funcionarioTurno = document.getElementById('bajaFuncionario').value.trim();
-        if (!funcionarioTurno) {
-            alert("Por favor ingrese el nombre del funcionario responsable del turno.");
-            return;
-        }
-
-        const datosBaja = {
-            codigo_objeto: parseInt(document.getElementById('bajaCodigoElemento').value),
-            tipo_salida: document.getElementById('bajaEstado').value,
-            fecha_salida: document.getElementById('bajaFecha').value,
-            hora_salida: document.getElementById('bajaHora').value,
-            categoria_retira: document.getElementById('bajaCategoria').value,
-            nombre_retira: document.getElementById('bajaNombre').value,
-            id_funcionario: usuarioActivo.id_usuario
-        };
-
-        try {
-            const response = await fetch('https://objetos-recuperadosean.onrender.com/api/objetos/baja', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(datosBaja)
-            });
-
-            if (!response.ok) throw new Error('Error al procesar la salida en el servidor');
-
-            const resultado = await response.json();
-            alert(resultado.mensaje);
-            cerrarModalBaja(); 
-            cargarTablaAdmin();
-        } catch (error) {
-            alert(`Error: ${error.message}`);
-        }
+    const funcionarioTurno = document.getElementById('bajaFuncionario').value.trim();
+    if (!funcionarioTurno) {
+        alert("Por favor ingrese el nombre del funcionario responsable del turno.");
+        return;
     }
 
-    // ==========================================
-    // EXPORTACIÓN DE DATOS A EXCEL (SheetJS)
-    // ==========================================
-    function descargarReporteExcel() {
-        if (objetosInventario.length === 0) return alert("No hay datos cargados para exportar.");
-        
-        const datos = objetosInventario.map(obj => ({
-            "Código": `#${obj.codigo}`, 
-            "Fecha Hallazgo": obj.fecha_hallazgo, 
-            "Lugar del Hallazgo": obj.lugar_hallazgo, 
-            "Clasificación": obj.clasificacion,
-            "Descripción": obj.descripcion, 
-            "Estado Actual": obj.estado_actual,
-            "Funcionario que procesa la salida": obj.funcionario_procesa || obj.nombre_funcionario || (obj.estado_actual === 'Activo' ? 'N/A (En Custodia)' : 'Sin Registro')
-        }));
-        
-        const ws = XLSX.utils.json_to_sheet(datos);
-        ws['!cols'] = [
-            {wch: 12}, // Código
-            {wch: 15}, // Fecha Hallazgo
-            {wch: 25}, // Lugar del Hallazgo
-            {wch: 15}, // Clasificación
-            {wch: 35}, // Descripción
-            {wch: 15}, // Estado Actual
-            {wch: 35}  // Funcionario que procesa la salida
-        ];
-        
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Inventario_ECO-S");
-        XLSX.writeFile(wb, `ECO-S_Reporte_Inventario_${new Date().toISOString().split('T')[0]}.xlsx`);
-    }
+    const datosBaja = {
+        codigo_objeto: parseInt(document.getElementById('bajaCodigoElemento').value),
+        tipo_salida: document.getElementById('bajaEstado').value,
+        fecha_salida: document.getElementById('bajaFecha').value,
+        hora_salida: document.getElementById('bajaHora').value,
+        categoria_retira: document.getElementById('bajaCategoria').value,
+        nombre_retira: document.getElementById('bajaNombre').value,
+        id_funcionario: usuarioActivo.id_usuario,
+        funcionario_turno: funcionarioTurno
+    };
 
+    try {
+        const response = await fetch('https://objetos-recuperadosean.onrender.com/api/objetos/baja', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(datosBaja)
+        });
+
+        if (!response.ok) throw new Error('Error al procesar la salida en el servidor');
+
+        const resultado = await response.json();
+        alert(resultado.mensaje);
+        cerrarModalBaja(); 
+        cargarTablaAdmin();
+    } catch (error) {
+        alert(`Error: ${error.message}`);
+    }
+}
+
+// EXPORTACIÓN DE DATOS A EXCEL COMPLETA (SheetJS)
+function descargarReporteExcel() {
+    if (objetosInventario.length === 0) return alert("No hay datos cargados para exportar.");
+    
+    const datos = objetosInventario.map(obj => ({
+        "Código": `#${obj.codigo}`, 
+        "Fecha Hallazgo": obj.fecha_hallazgo, 
+        "Lugar del Hallazgo": obj.lugar_hallazgo, 
+        "Clasificación": obj.clasificacion,
+        "Descripción": obj.descripcion, 
+        "Estado Actual": obj.estado_actual,
+        "Categoría de quien retira": obj.categoria_retira || (obj.estado_actual === 'Activo' ? 'N/A (En Custodia)' : 'Sin Registro'),
+        "Entregado / Retirado por": obj.nombre_retira || (obj.estado_actual === 'Activo' ? 'N/A (En Custodia)' : 'Sin Registro'),
+        "Fecha / Hora Salida": obj.fecha_salida ? `${obj.fecha_salida} ${obj.hora_salida || ''}` : (obj.estado_actual === 'Activo' ? 'N/A (En Custodia)' : 'Sin Registro'),
+        "Funcionario que procesa la salida": obj.funcionario_procesa || (obj.estado_actual === 'Activo' ? 'N/A (En Custodia)' : 'Sin Registro')
+    }));
+    
+    const ws = XLSX.utils.json_to_sheet(datos);
+    ws['!cols'] = [
+        {wch: 12}, // Código
+        {wch: 15}, // Fecha Hallazgo
+        {wch: 25}, // Lugar del Hallazgo
+        {wch: 15}, // Clasificación
+        {wch: 35}, // Descripción
+        {wch: 15}, // Estado Actual
+        {wch: 25}, // Categoría de quien retira
+        {wch: 30}, // Entregado / Retirado por
+        {wch: 22}, // Fecha / Hora Salida
+        {wch: 35}  // Funcionario que procesa la salida
+    ];
+    
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Inventario_ECO-S");
+    XLSX.writeFile(wb, `ECO-S_Reporte_Inventario_${new Date().toISOString().split('T')[0]}.xlsx`);
+    }
+        
     // ==========================================
     // 3. Módulo: Gestión de Usuarios
     // ==========================================
