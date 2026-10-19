@@ -1,5 +1,6 @@
 import os
 import smtplib
+import socket
 import traceback
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -15,39 +16,28 @@ SMTP_USER = os.getenv("SMTP_USER", "").strip()
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "").strip()
 EMAIL_FROM_NAME = os.getenv("EMAIL_FROM_NAME", "ECO-S - Universidad EAN")
 
-# Correos institucionales fijos para notificación y seguimiento de seguridad/logística
 CORREOS_INSTITUCIONALES = [
     "logisyaudio@universidadean.edu.co",
     "colviseg@universidadean.edu.co"
 ]
 
 def enviar_correo_solicitud_reclamo(destinatario_solicitante: str, datos_baja: dict):
-    """
-    Envía la notificación automática de reclamación a:
-    1. El correo ingresado por el solicitante (estudiante o funcionario).
-    2. logisyaudio@universidadean.edu.co
-    3. colviseg@universidadean.edu.co
-    """
     if not SMTP_USER or not SMTP_PASSWORD:
-        print("[ECO-S EMAIL O365] ERROR: Credenciales SMTP de Office 365 no configuradas en Render (SMTP_USER / SMTP_PASSWORD).")
+        print("[ECO-S EMAIL O365] ERROR: Credenciales SMTP no configuradas.", flush=True)
         return
 
-    # Limpieza y validación de dirección del solicitante
     destinatario_limpio = destinatario_solicitante.strip().lower() if destinatario_solicitante else ""
     if not destinatario_limpio:
-        print("[ECO-S EMAIL O365] ERROR: No se proporcionó un correo de destinatario válido.")
+        print("[ECO-S EMAIL O365] ERROR: Correo destinatario inválido.", flush=True)
         return
 
-    # Consolidar lista de destinatarios sin duplicados
     todos_los_destinatarios = list(set([destinatario_limpio] + [c.strip().lower() for c in CORREOS_INSTITUCIONALES]))
 
-    # Extracción segura de datos con valores por defecto
     codigo_obj = datos_baja.get("codigo_objeto", "N/A")
     nombre_retira = datos_baja.get("nombre_retira", "Solicitante")
 
     asunto = f"Solicitud de Reclamación - Objeto #{codigo_obj}"
 
-    # Texto en plano exacto según requerimiento institucional
     cuerpo_texto = f"""Cordial saludo.
 
 Se ha generado la solicitud por el elemento "#{codigo_obj}" por parte de "{nombre_retira}".
@@ -58,7 +48,6 @@ Si tienes alguna duda puedes escribir un correo a logisyaudio@universidadean.edu
 
 Muchas gracias."""
 
-    # Plantilla HTML con formato e identidad institucional
     cuerpo_html = f"""<!DOCTYPE html>
 <html>
 <head>
@@ -93,18 +82,27 @@ Muchas gracias."""
     mensaje.attach(MIMEText(cuerpo_texto, "plain", "utf-8"))
     mensaje.attach(MIMEText(cuerpo_html, "html", "utf-8"))
 
+    # PARCHE: Forzar resolución IPv4 para evitar "Network is unreachable" en Render
+    original_getaddrinfo = socket.getaddrinfo
+
+    def getaddrinfo_ipv4(host, port, family=0, type=0, proto=0, flags=0):
+        return original_getaddrinfo(host, port, socket.AF_INET, type, proto, flags)
+
+    socket.getaddrinfo = getaddrinfo_ipv4
+
     try:
-        print(f"[ECO-S EMAIL O365] Conectando al servidor SMTP {SMTP_SERVER}:{SMTP_PORT}...", flush=True)
+        print(f"[ECO-S EMAIL O365] Conectando por IPv4 al servidor SMTP {SMTP_SERVER}:{SMTP_PORT}...", flush=True)
         server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=15)
         server.ehlo()
         server.starttls()
         server.ehlo()
         server.login(SMTP_USER, SMTP_PASSWORD)
-        
-        # Enviar el correo a la lista completa de destinatarios (To + Cc)
         server.sendmail(SMTP_USER, todos_los_destinatarios, mensaje.as_string())
         server.quit()
         print(f"[ECO-S EMAIL O365] Notificación enviada exitosamente a: {', '.join(todos_los_destinatarios)}", flush=True)
     except Exception as e:
         print(f"[ECO-S EMAIL ERROR O365] Falló el envío del mensaje: {str(e)}", flush=True)
         print(f"[ECO-S EMAIL ERROR O365] Detalle técnico:\n{traceback.format_exc()}", flush=True)
+    finally:
+        # Restaurar la resolución original del sistema
+        socket.getaddrinfo = original_getaddrinfo
