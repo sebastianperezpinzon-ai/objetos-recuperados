@@ -94,7 +94,7 @@ Muchas gracias."""
     mensaje.attach(MIMEText(cuerpo_html, "html", "utf-8"))
 
     try:
-        print(f"[ECO-S EMAIL O365] Conectando al servidor SMTP {SMTP_SERVER}:{SMTP_PORT}...")
+        print(f"[ECO-S EMAIL O365] Conectando al servidor SMTP {SMTP_SERVER}:{SMTP_PORT}...", flush=True)
         server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=15)
         server.ehlo()
         server.starttls()
@@ -104,7 +104,7 @@ Muchas gracias."""
         # Enviar el correo a la lista completa de destinatarios (To + Cc)
         server.sendmail(SMTP_USER, todos_los_destinatarios, mensaje.as_string())
         server.quit()
-        print(f"[ECO-S EMAIL O365] Notificación enviada exitosamente a: {', '.join(todos_los_destinatarios)}")
+        print(f"[ECO-S EMAIL O365] Notificación enviada exitosamente a: {', '.join(todos_los_destinatarios)}", flush=True)
     except Exception as e:
-        print(f"[ECO-S EMAIL ERROR O365] Falló el envío del mensaje: {str(e)}")
-        print(f"[ECO-S EMAIL ERROR O365] Detalle técnico:\n{traceback.format_exc()}")
+        print(f"[ECO-S EMAIL ERROR O365] Falló el envío del mensaje: {str(e)}", flush=True)
+        print(f"[ECO-S EMAIL ERROR O365] Detalle técnico:\n{traceback.format_exc()}", flush=True)
