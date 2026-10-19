@@ -16,8 +16,8 @@ CORREOS_INSTITUCIONALES = [
 ]
 
 def enviar_correo_solicitud_reclamo(destinatario_solicitante: str, datos_baja: dict):
-    if not RESEND_API_KEY:
-        print("[ECO-S RESEND ERROR] Falta la variable RESEND_API_KEY en el entorno de Render.", flush=True)
+    if not BREVO_API_KEY or not EMAIL_FROM_ADDRESS:
+        print("[ECO-S BREVO ERROR] Configuración incompleta: Asegúrate de definir BREVO_API_KEY y EMAIL_FROM_ADDRESS en Render.", flush=True)
         return
 
     destinatario_limpio = destinatario_solicitante.strip().lower() if destinatario_solicitante else ""
