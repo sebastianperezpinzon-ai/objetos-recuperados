@@ -1,37 +1,33 @@
 import os
+import requests
 import traceback
-import resend
 from dotenv import load_dotenv
 
 load_dotenv()
 
-# Carga de la API Key de Resend y Remitente
-RESEND_API_KEY = os.getenv("RESEND_API_KEY", "").strip()
-EMAIL_FROM = os.getenv("EMAIL_FROM", "ECO-S EAN <onboarding@resend.dev>").strip()
+# Declaración de variables globales de Brevo (AQUÍ ESTABA EL FALTANTE)
+BREVO_API_KEY = os.getenv("BREVO_API_KEY", "").strip()
+EMAIL_FROM_ADDRESS = os.getenv("EMAIL_FROM_ADDRESS", "").strip()
+EMAIL_FROM_NAME = os.getenv("EMAIL_FROM_NAME", "ECO-S - Universidad EAN").strip()
 
-# Correos institucionales para seguimiento de seguridad y logística
 CORREOS_INSTITUCIONALES = [
     "logisyaudio@universidadean.edu.co",
     "colviseg@universidadean.edu.co"
 ]
 
 def enviar_correo_solicitud_reclamo(destinatario_solicitante: str, datos_baja: dict):
+    """
+    Envía la notificación de reclamación utilizando la API REST v3 de Brevo sobre HTTPS (Puerto 443).
+    """
+    # Validar que existan las credenciales necesarias
     if not BREVO_API_KEY or not EMAIL_FROM_ADDRESS:
         print("[ECO-S BREVO ERROR] Configuración incompleta: Asegúrate de definir BREVO_API_KEY y EMAIL_FROM_ADDRESS en Render.", flush=True)
         return
 
     destinatario_limpio = destinatario_solicitante.strip().lower() if destinatario_solicitante else ""
     if not destinatario_limpio:
-        print("[ECO-S RESEND ERROR] Dirección de correo solicitante no válida.", flush=True)
+        print("[ECO-S BREVO ERROR] Correo destinatario no válido.", flush=True)
         return
-
-    # Si estamos en modo de prueba con el remitente por defecto de Resend,
-    # solo se permite enviar al correo del propietario (sebastian.perezpinzon@gmail.com)
-    if "onboarding@resend.dev" in EMAIL_FROM:
-        todos_los_destinatarios = ["sebastian.perezpinzon@gmail.com"]
-        print("[ECO-S RESEND] MODO PRUEBA: Redirigiendo envío a la cuenta del propietario (sebastian.perezpinzon@gmail.com).", flush=True)
-    else:
-        todos_los_destinatarios = list(set([destinatario_limpio] + [c.strip().lower() for c in CORREOS_INSTITUCIONALES]))
 
     codigo_obj = datos_baja.get("codigo_objeto", "N/A")
     nombre_retira = datos_baja.get("nombre_retira", "Solicitante")
@@ -73,21 +69,41 @@ Muchas gracias."""
 </body>
 </html>"""
 
-    resend.api_key = RESEND_API_KEY
+    # Construcción de la carga útil para la API v3 de Brevo
+    url = "https://api.brevo.com/v3/smtp/email"
+    headers = {
+        "accept": "application/json",
+        "api-key": BREVO_API_KEY,
+        "content-type": "application/json"
+    }
+
+    payload = {
+        "sender": {
+            "name": EMAIL_FROM_NAME,
+            "email": EMAIL_FROM_ADDRESS
+        },
+        "to": [
+            {"email": destinatario_limpio}
+        ],
+        "cc": [
+            {"email": c.strip().lower()} for c in CORREOS_INSTITUCIONALES
+        ],
+        "subject": asunto,
+        "textContent": cuerpo_texto,
+        "htmlContent": cuerpo_html
+    }
 
     try:
-        print(f"[ECO-S RESEND] Enviando correo vía API HTTPS a {len(todos_los_destinatarios)} destinatario(s)...", flush=True)
-        
-        respuesta = resend.Emails.send({
-            "from": EMAIL_FROM,
-            "to": todos_los_destinatarios,
-            "subject": asunto,
-            "text": cuerpo_texto,
-            "html": cuerpo_html
-        })
-        
-        id_mensaje = respuesta.get("id") if isinstance(respuesta, dict) else getattr(respuesta, "id", "OK")
-        print(f"[ECO-S RESEND SUCCESS] Notificación enviada exitosamente. Message ID: {id_mensaje}", flush=True)
+        print(f"[ECO-S BREVO] Enviando notificación HTTP POST a Brevo para {destinatario_limpio}...", flush=True)
+        response = requests.post(url, json=payload, headers=headers, timeout=10)
+
+        if response.status_code in [200, 201]:
+            res_json = response.json()
+            message_id = res_json.get("messageId", "OK")
+            print(f"[ECO-S BREVO SUCCESS] Correo entregado a la API. Message ID: {message_id}", flush=True)
+        else:
+            print(f"[ECO-S BREVO ERROR] Brevo respondió con código {response.status_code}: {response.text}", flush=True)
+
     except Exception as e:
-        print(f"[ECO-S RESEND ERROR] Falló el envío del mensaje vía API HTTPS: {str(e)}", flush=True)
-        print(f"[ECO-S RESEND ERROR] Detalle técnico:\n{traceback.format_exc()}", flush=True)
+        print(f"[ECO-S BREVO ERROR] Excepción al conectar con la API de Brevo: {str(e)}", flush=True)
+        print(f"[ECO-S BREVO ERROR] Detalle técnico:\n{traceback.format_exc()}", flush=True)
