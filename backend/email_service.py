@@ -16,10 +16,6 @@ CORREOS_INSTITUCIONALES = [
 ]
 
 def enviar_correo_solicitud_reclamo(destinatario_solicitante: str, datos_baja: dict):
-    """
-    Envía la notificación automática de reclamación vía API REST HTTPS (Resend)
-    a las cuentas institucionales y al estudiante/solicitante.
-    """
     if not RESEND_API_KEY:
         print("[ECO-S RESEND ERROR] Falta la variable RESEND_API_KEY en el entorno de Render.", flush=True)
         return
@@ -29,8 +25,13 @@ def enviar_correo_solicitud_reclamo(destinatario_solicitante: str, datos_baja: d
         print("[ECO-S RESEND ERROR] Dirección de correo solicitante no válida.", flush=True)
         return
 
-    # Consolidar lista de destinatarios sin duplicados
-    todos_los_destinatarios = list(set([destinatario_limpio] + [c.strip().lower() for c in CORREOS_INSTITUCIONALES]))
+    # Si estamos en modo de prueba con el remitente por defecto de Resend,
+    # solo se permite enviar al correo del propietario (sebastian.perezpinzon@gmail.com)
+    if "onboarding@resend.dev" in EMAIL_FROM:
+        todos_los_destinatarios = ["sebastian.perezpinzon@gmail.com"]
+        print("[ECO-S RESEND] MODO PRUEBA: Redirigiendo envío a la cuenta del propietario (sebastian.perezpinzon@gmail.com).", flush=True)
+    else:
+        todos_los_destinatarios = list(set([destinatario_limpio] + [c.strip().lower() for c in CORREOS_INSTITUCIONALES]))
 
     codigo_obj = datos_baja.get("codigo_objeto", "N/A")
     nombre_retira = datos_baja.get("nombre_retira", "Solicitante")
@@ -72,13 +73,11 @@ Muchas gracias."""
 </body>
 </html>"""
 
-    # Asignar la clave de API
     resend.api_key = RESEND_API_KEY
 
     try:
         print(f"[ECO-S RESEND] Enviando correo vía API HTTPS a {len(todos_los_destinatarios)} destinatario(s)...", flush=True)
         
-        # Petición HTTPS nativa a la API de Resend
         respuesta = resend.Emails.send({
             "from": EMAIL_FROM,
             "to": todos_los_destinatarios,
