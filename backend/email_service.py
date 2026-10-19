@@ -1,21 +1,15 @@
 import os
-import smtplib
-import socket
 import traceback
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from email.header import Header
+import resend
 from dotenv import load_dotenv
 
 load_dotenv()
 
-# Configuración de variables de entorno con limpieza de espacios
-SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.office365.com").strip()
-SMTP_PORT = int(os.getenv("SMTP_PORT", 587))
-SMTP_USER = os.getenv("SMTP_USER", "").strip()
-SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "").strip()
-EMAIL_FROM_NAME = os.getenv("EMAIL_FROM_NAME", "Logística y audiovisuales - Universidad EAN").strip()
+# Carga de la API Key de Resend y Remitente
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", "").strip()
+EMAIL_FROM = os.getenv("EMAIL_FROM", "ECO-S EAN <onboarding@resend.dev>").strip()
 
+# Correos institucionales para seguimiento de seguridad y logística
 CORREOS_INSTITUCIONALES = [
     "logisyaudio@universidadean.edu.co",
     "colviseg@universidadean.edu.co"
@@ -23,20 +17,19 @@ CORREOS_INSTITUCIONALES = [
 
 def enviar_correo_solicitud_reclamo(destinatario_solicitante: str, datos_baja: dict):
     """
-    Envía la notificación automática de reclamación a:
-    1. El correo ingresado por el solicitante.
-    2. logisyaudio@universidadean.edu.co
-    3. colviseg@universidadean.edu.co
+    Envía la notificación automática de reclamación vía API REST HTTPS (Resend)
+    a las cuentas institucionales y al estudiante/solicitante.
     """
-    if not SMTP_USER or not SMTP_PASSWORD:
-        print("[ECO-S EMAIL O365] ERROR: Credenciales SMTP no configuradas en el entorno.", flush=True)
+    if not RESEND_API_KEY:
+        print("[ECO-S RESEND ERROR] Falta la variable RESEND_API_KEY en el entorno de Render.", flush=True)
         return
 
     destinatario_limpio = destinatario_solicitante.strip().lower() if destinatario_solicitante else ""
     if not destinatario_limpio:
-        print("[ECO-S EMAIL O365] ERROR: Correo de destinatario no válido.", flush=True)
+        print("[ECO-S RESEND ERROR] Dirección de correo solicitante no válida.", flush=True)
         return
 
+    # Consolidar lista de destinatarios sin duplicados
     todos_los_destinatarios = list(set([destinatario_limpio] + [c.strip().lower() for c in CORREOS_INSTITUCIONALES]))
 
     codigo_obj = datos_baja.get("codigo_objeto", "N/A")
@@ -79,38 +72,23 @@ Muchas gracias."""
 </body>
 </html>"""
 
-    mensaje = MIMEMultipart("alternative")
-    mensaje["Subject"] = Header(asunto, "utf-8")
-    mensaje["From"] = f"{EMAIL_FROM_NAME} <{SMTP_USER}>"
-    mensaje["To"] = destinatario_limpio
-    mensaje["Cc"] = ", ".join(CORREOS_INSTITUCIONALES)
-
-    mensaje.attach(MIMEText(cuerpo_texto, "plain", "utf-8"))
-    mensaje.attach(MIMEText(cuerpo_html, "html", "utf-8"))
-
-    # Parche: Forzar resolución IPv4 para prevenir errores de enrutamiento en la red de Render
-    original_getaddrinfo = socket.getaddrinfo
-    def getaddrinfo_ipv4(host, port, family=0, type=0, proto=0, flags=0):
-        return original_getaddrinfo(host, port, socket.AF_INET, type, proto, flags)
-    socket.getaddrinfo = getaddrinfo_ipv4
+    # Asignar la clave de API
+    resend.api_key = RESEND_API_KEY
 
     try:
-        print(f"[ECO-S EMAIL O365] Conectando a {SMTP_SERVER}:{SMTP_PORT}...", flush=True)
+        print(f"[ECO-S RESEND] Enviando correo vía API HTTPS a {len(todos_los_destinatarios)} destinatario(s)...", flush=True)
         
-        if SMTP_PORT == 465:
-            server = smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT, timeout=15)
-        else:
-            server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=15)
-            server.ehlo()
-            server.starttls()
-            server.ehlo()
-
-        server.login(SMTP_USER, SMTP_PASSWORD)
-        server.sendmail(SMTP_USER, todos_los_destinatarios, mensaje.as_string())
-        server.quit()
-        print(f"[ECO-S EMAIL O365] Notificación enviada exitosamente a: {', '.join(todos_los_destinatarios)}", flush=True)
+        # Petición HTTPS nativa a la API de Resend
+        respuesta = resend.Emails.send({
+            "from": EMAIL_FROM,
+            "to": todos_los_destinatarios,
+            "subject": asunto,
+            "text": cuerpo_texto,
+            "html": cuerpo_html
+        })
+        
+        id_mensaje = respuesta.get("id") if isinstance(respuesta, dict) else getattr(respuesta, "id", "OK")
+        print(f"[ECO-S RESEND SUCCESS] Notificación enviada exitosamente. Message ID: {id_mensaje}", flush=True)
     except Exception as e:
-        print(f"[ECO-S EMAIL ERROR O365] Falló el envío del mensaje: {str(e)}", flush=True)
-        print(f"[ECO-S EMAIL ERROR O365] Detalle técnico:\n{traceback.format_exc()}", flush=True)
-    finally:
-        socket.getaddrinfo = original_getaddrinfo
+        print(f"[ECO-S RESEND ERROR] Falló el envío del mensaje vía API HTTPS: {str(e)}", flush=True)
+        print(f"[ECO-S RESEND ERROR] Detalle técnico:\n{traceback.format_exc()}", flush=True)
