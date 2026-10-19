@@ -164,8 +164,9 @@ def solicitar_reclamo_publico(solicitud: SolicitudReclamoPublica, background_tas
 
         # 2. Empaquetar datos para la notificación por correo
         datos_correo = {
-            "codigo_objeto": solicitud.codigo_objeto,
-            "nombre_retira": solicitud.nombre_solicitante
+            "codigo_objeto": objeto.get("codigo"),
+            "nombre_retira": solicitud.nombre_solicitante,
+            "descripcion": objeto.get("descripcion", "Sin descripción")            
         }
 
         # 3. Disparar correo asíncrono vía Office 365
