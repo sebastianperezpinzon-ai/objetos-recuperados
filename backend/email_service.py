@@ -91,15 +91,20 @@ Muchas gracias."""
     socket.getaddrinfo = getaddrinfo_ipv4
 
     try:
-        print(f"[ECO-S EMAIL O365] Conectando por IPv4 al servidor SMTP {SMTP_SERVER}:{SMTP_PORT}...", flush=True)
+    print(f"[ECO-S EMAIL O365] Conectando a {SMTP_SERVER}:{SMTP_PORT}...", flush=True)
+    
+    if SMTP_PORT == 465:
+        server = smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT, timeout=15)
+    else:
         server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=15)
         server.ehlo()
         server.starttls()
         server.ehlo()
-        server.login(SMTP_USER, SMTP_PASSWORD)
-        server.sendmail(SMTP_USER, todos_los_destinatarios, mensaje.as_string())
-        server.quit()
-        print(f"[ECO-S EMAIL O365] Notificación enviada exitosamente a: {', '.join(todos_los_destinatarios)}", flush=True)
+        
+    server.login(SMTP_USER, SMTP_PASSWORD)
+    server.sendmail(SMTP_USER, todos_los_destinatarios, mensaje.as_string())
+    server.quit()
+    print(f"[ECO-S EMAIL O365] Notificación enviada exitosamente a: {', '.join(todos_los_destinatarios)}", flush=True)
     except Exception as e:
         print(f"[ECO-S EMAIL ERROR O365] Falló el envío del mensaje: {str(e)}", flush=True)
         print(f"[ECO-S EMAIL ERROR O365] Detalle técnico:\n{traceback.format_exc()}", flush=True)
