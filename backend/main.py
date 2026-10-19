@@ -64,7 +64,8 @@ class BajaRequest(BaseModel):
     categoria_retira: str
     nombre_retira: str
     id_funcionario: int  # Trazabilidad Operativa
-    correo_notificacion: Optional[str] = None  # Correo del estudiante/colaborador para constancia
+    funcionario_turno: Optional[str] = None  # Nombre del funcionario responsable en turno
+    correo_notificacion: Optional[str] = None
 
 class SolicitudReclamoPublica(BaseModel):
     codigo_objeto: int
@@ -190,8 +191,36 @@ def solicitar_reclamo_publico(solicitud: SolicitudReclamoPublica, background_tas
 @app.get("/api/objetos", tags=["Inventario"])
 def listar_objetos():
     try:
-        respuesta = supabase.table("objetos").select("*").order("codigo", desc=True).execute()
-        return respuesta.data
+        # 1. Consultar todos los objetos
+        respuesta_obj = supabase.table("objetos").select("*").order("codigo", desc=True).execute()
+        objetos = respuesta_obj.data
+
+        # 2. Consultar la tabla de trazabilidad de salidas
+        salidas_dict = {}
+        try:
+            respuesta_salidas = supabase.table("trazabilidad_salidas").select("*").execute()
+            for salida in respuesta_salidas.data:
+                salidas_dict[salida["codigo_objeto"]] = salida
+        except Exception as e_salidas:
+            print("Aviso al consultar trazabilidad_salidas:", str(e_salidas))
+
+        # 3. Enriquecer cada objeto con la información de su salida (si aplica)
+        for obj in objetos:
+            salida = salidas_dict.get(obj["codigo"])
+            if salida:
+                obj["nombre_retira"] = salida.get("nombre_retira")
+                obj["categoria_retira"] = salida.get("categoria_retira")
+                obj["funcionario_procesa"] = salida.get("funcionario_turno") or salida.get("nombre_funcionario")
+                obj["fecha_salida"] = salida.get("fecha_salida")
+                obj["hora_salida"] = salida.get("hora_salida")
+            else:
+                obj["nombre_retira"] = None
+                obj["categoria_retira"] = None
+                obj["funcionario_procesa"] = None
+                obj["fecha_salida"] = None
+                obj["hora_salida"] = None
+
+        return objetos
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al consultar objetos: {str(e)}")
 
@@ -215,7 +244,7 @@ def registrar_objeto(objeto: ObjetoCreate):
 @app.post("/api/objetos/baja", tags=["Trazabilidad"])
 def procesar_salida_objeto(baja: BajaRequest, background_tasks: BackgroundTasks):
     try:
-        # 1. Registrar la trazabilidad de salida
+        # 1. Registrar la trazabilidad de salida incluyendo el funcionario en turno
         registro_salida = {
             "codigo_objeto": baja.codigo_objeto,
             "id_funcionario": baja.id_funcionario,
@@ -223,28 +252,38 @@ def procesar_salida_objeto(baja: BajaRequest, background_tasks: BackgroundTasks)
             "fecha_salida": baja.fecha_salida,
             "hora_salida": baja.hora_salida,
             "categoria_retira": baja.categoria_retira,
-            "nombre_retira": baja.nombre_retira
+            "nombre_retira": baja.nombre_retira,
+            "funcionario_turno": baja.funcionario_turno
         }
-        supabase.table("trazabilidad_salidas").insert(registro_salida).execute()
         
+        try:
+            supabase.table("trazabilidad_salidas").insert(registro_salida).execute()
+        except Exception as insert_err:
+            # Fallback en caso de variación de nombre de columna en la BD
+            if "funcionario_turno" in str(insert_err):
+                del registro_salida["funcionario_turno"]
+                registro_salida["nombre_funcionario"] = baja.funcionario_turno
+                supabase.table("trazabilidad_salidas").insert(registro_salida).execute()
+            else:
+                raise insert_err
+
         # 2. Actualizar el estado del objeto en la tabla 'objetos'
         supabase.table("objetos") \
             .update({"estado_actual": baja.tipo_salida}) \
             .eq("codigo", baja.codigo_objeto) \
             .execute()
 
-        # 3. Tarea en segundo plano para envío de correo
+        # 3. Tarea en segundo plano para notificación por correo
         if baja.correo_notificacion:
             background_tasks.add_task(
                 enviar_correo_solicitud_reclamo,
                 destinatario_solicitante=baja.correo_notificacion,
                 datos_baja=baja.dict()
             )
-            
+
         return {"mensaje": f"Objeto #{baja.codigo_objeto} actualizado exitosamente a estado '{baja.tipo_salida}'."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al procesar la salida: {str(e)}")
-
 # ==========================================
 # MÓDULO: GESTIÓN DE USUARIOS (ADMINISTRACIÓN)
 # ==========================================
