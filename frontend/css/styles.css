@@ -23,41 +23,55 @@ body {
     line-height: 1.6;
 }
 
-/* --- Navegación Superior --- */
+/* Barra de navegación principal */
 .navbar {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background-color: var(--primary-color);
-    padding: 1rem 5%;
-    color: var(--white);
-    box-shadow: var(--shadow-md);
+    justify-content: space-between; /* Separa el bloque de la marca a la izquierda y el botón a la derecha */
+    align-items: center;            /* Centra verticalmente los elementos */
+    padding: 12px 30px;            /* Relleno interno armónico */
+    background-color: #005A43;      /* Verde institucional EAN */
+    color: #ffffff;
 }
 
-.navbar h1 {
+/* Agrupador de Logo + Título */
+.navbar-brand {
+    display: flex;
+    align-items: center;            /* Alinea verticalmente el logo con el texto */
+    gap: 15px;                      /* Espacio horizontal entre el logo y el título */
+}
+
+/* Estilo optimizado para el Logo EAN */
+.logo-ean {
+    height: 42px;                   /* Altura proporcional para barra superior */
+    width: auto;                    /* Mantiene la proporción aspecto original */
+    object-fit: contain;
+    display: block;
+}
+
+/* Estilo del título */
+.navbar-brand h1 {
+    font-size: 1.4rem;
+    font-weight: 600;
     margin: 0;
-    font-size: 1.5rem;
-    font-weight: 600;
-    letter-spacing: 0.5px;
+    color: #ffffff;
+    white-space: nowrap;            /* Evita que el título se parta en dos líneas */
 }
 
+/* Botón administrativo */
 .btn-admin {
-    background-color: transparent;
-    color: var(--white);
-    border: 1px solid var(--white);
-    padding: 0.5rem 1.5rem;
-    border-radius: 4px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: var(--transition);
+    padding: 8px 18px;
+    border: 1px solid #ffffff;
+    border-radius: 6px;
+    color: #ffffff;
     text-decoration: none;
+    font-weight: 500;
+    transition: background-color 0.2s, color 0.2s;
 }
 
 .btn-admin:hover {
-    background-color: var(--white);
-    color: var(--primary-color);
+    background-color: #ffffff;
+    color: #005A43;
 }
-
 /* --- Contenedores y Alertas --- */
 .container {
     max-width: 1200px;
