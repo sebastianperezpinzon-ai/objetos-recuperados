@@ -244,7 +244,7 @@ def registrar_objeto(objeto: ObjetoCreate):
 @app.post("/api/objetos/baja", tags=["Trazabilidad"])
 def procesar_salida_objeto(baja: BajaRequest, background_tasks: BackgroundTasks):
     try:
-        # 1. Registrar la trazabilidad de salida incluyendo el funcionario en turno
+        # 1. Preparar datos base de trazabilidad
         registro_salida = {
             "codigo_objeto": baja.codigo_objeto,
             "id_funcionario": baja.id_funcionario,
@@ -252,20 +252,26 @@ def procesar_salida_objeto(baja: BajaRequest, background_tasks: BackgroundTasks)
             "fecha_salida": baja.fecha_salida,
             "hora_salida": baja.hora_salida,
             "categoria_retira": baja.categoria_retira,
-            "nombre_retira": baja.nombre_retira,
-            "funcionario_turno": baja.funcionario_turno
+            "nombre_retira": baja.nombre_retira
         }
-        
+
+        # Incluir funcionario_turno si viene en la petición
+        if baja.funcionario_turno:
+            registro_salida["funcionario_turno"] = baja.funcionario_turno
+
+        # Intentar inserción con gestión de tolerancias
         try:
             supabase.table("trazabilidad_salidas").insert(registro_salida).execute()
-        except Exception as insert_err:
-            # Fallback en caso de variación de nombre de columna en la BD
-            if "funcionario_turno" in str(insert_err):
-                del registro_salida["funcionario_turno"]
-                registro_salida["nombre_funcionario"] = baja.funcionario_turno
+        except Exception as e_ins:
+            print("Aviso: Reintentando inserción sin 'funcionario_turno':", str(e_ins))
+            registro_salida.pop("funcionario_turno", None)
+            
+            try:
                 supabase.table("trazabilidad_salidas").insert(registro_salida).execute()
-            else:
-                raise insert_err
+            except Exception as e_fk:
+                print("Aviso: Reintentando inserción omitiendo id_funcionario:", str(e_fk))
+                registro_salida["id_funcionario"] = None
+                supabase.table("trazabilidad_salidas").insert(registro_salida).execute()
 
         # 2. Actualizar el estado del objeto en la tabla 'objetos'
         supabase.table("objetos") \
@@ -273,7 +279,7 @@ def procesar_salida_objeto(baja: BajaRequest, background_tasks: BackgroundTasks)
             .eq("codigo", baja.codigo_objeto) \
             .execute()
 
-        # 3. Tarea en segundo plano para notificación por correo
+        # 3. Notificación por correo en segundo plano
         if baja.correo_notificacion:
             background_tasks.add_task(
                 enviar_correo_solicitud_reclamo,
@@ -283,6 +289,7 @@ def procesar_salida_objeto(baja: BajaRequest, background_tasks: BackgroundTasks)
 
         return {"mensaje": f"Objeto #{baja.codigo_objeto} actualizado exitosamente a estado '{baja.tipo_salida}'."}
     except Exception as e:
+        print("Error crítico en procesar_salida_objeto:", str(e))
         raise HTTPException(status_code=500, detail=f"Error al procesar la salida: {str(e)}")
 # ==========================================
 # MÓDULO: GESTIÓN DE USUARIOS (ADMINISTRACIÓN)
