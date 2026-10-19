@@ -9,19 +9,23 @@ from supabase import create_client, Client
 # Importar servicio de correo de Office 365
 from email_service import enviar_correo_solicitud_reclamo
 
-# 1. Carga de variables de entorno
+# ==========================================
+# 1. CARGA DE VARIABLES DE ENTORNO Y SUPABASE
+# ==========================================
 load_dotenv()
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
 if not SUPABASE_URL or not SUPABASE_KEY:
-    raise RuntimeError("Faltan las credenciales de Supabase en el archivo .env")
+    raise RuntimeError("Faltan las credenciales de Supabase en las variables de entorno.")
 
-# 2. Cliente oficial de Supabase
+# Cliente oficial de Supabase
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# 3. Inicialización de la aplicación FastAPI
+# ==========================================
+# 2. INICIALIZACIÓN DE FASTAPI
+# ==========================================
 app = FastAPI(
     title="API REST - ECO-S EAN",
     description="Sistema Nervioso Central para la gestión de objetos recuperados, trazabilidad del campus y notificaciones institucionales.",
@@ -62,8 +66,19 @@ class BajaRequest(BaseModel):
     id_funcionario: int  # Trazabilidad Operativa
     correo_notificacion: Optional[str] = None  # Correo del estudiante/colaborador para constancia
 
+class SolicitudReclamoPublica(BaseModel):
+    codigo_objeto: int
+    nombre_solicitante: str
+    correo_institucional: str
+    telefono_contacto: Optional[str] = None
+
+class UsuarioCreate(BaseModel):
+    correo: str
+    contrasena: str
+    rol: str
+
 # ==========================================
-# RUTAS / ENDPOINTS
+# RUTAS DE SISTEMA Y SALUD
 # ==========================================
 
 @app.get("/", tags=["Sistema"])
@@ -82,16 +97,15 @@ def probar_conexion_db():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al conectar con Supabase: {str(e)}")
 
-# ------------------------------------------
-# AUTENTICACIÓN
-# ------------------------------------------
+# ==========================================
+# MÓDULO: AUTENTICACIÓN
+# ==========================================
 
 @app.post("/api/auth/login", tags=["Autenticación"])
 def autenticar_usuario(datos: LoginRequest):
     correo_limpio = datos.correo.strip().lower()
     
     try:
-        # Consulta a la tabla 'usuarios'
         respuesta = supabase.table("usuarios") \
             .select("id_usuario, correo, rol, activo, password_hash") \
             .eq("correo", correo_limpio) \
@@ -111,7 +125,6 @@ def autenticar_usuario(datos: LoginRequest):
                 detail="El usuario se encuentra inactivo en la plataforma"
             )
             
-        # Verificación de contraseña
         if usuario["password_hash"] != datos.password:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -131,20 +144,14 @@ def autenticar_usuario(datos: LoginRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error interno en autenticación: {str(e)}")
 
-    # ------------------------------------------
-# MODELO Y ENDPOINT PARA SOLICITUD PÚBLICA (INDEX)
-# ------------------------------------------
-
-class SolicitudReclamoPublica(BaseModel):
-    codigo_objeto: int
-    nombre_solicitante: str
-    correo_institucional: str
-    telefono_contacto: Optional[str] = None
+# ==========================================
+# MÓDULO: SOLICITUD PÚBLICA (INDEX)
+# ==========================================
 
 @app.post("/api/objetos/solicitar-reclamo", tags=["Público"])
 def solicitar_reclamo_publico(solicitud: SolicitudReclamoPublica, background_tasks: BackgroundTasks):
     try:
-        # 1. Verificar que el objeto exista y continúe en estado 'Activo'
+        # 1. Verificar existencia y estado activo del objeto
         res = supabase.table("objetos").select("*").eq("codigo", solicitud.codigo_objeto).execute()
         
         if not res.data:
@@ -154,13 +161,13 @@ def solicitar_reclamo_publico(solicitud: SolicitudReclamoPublica, background_tas
         if objeto.get("estado_actual") != "Activo":
             raise HTTPException(status_code=400, detail="Este objeto ya fue procesado o entregado previamente.")
 
-        # 2. Empaquetar datos para la plantilla de correo
+        # 2. Empaquetar datos para la notificación por correo
         datos_correo = {
             "codigo_objeto": solicitud.codigo_objeto,
             "nombre_retira": solicitud.nombre_solicitante
         }
 
-        # 3. Disparar notificación automática vía Office 365 (Solicitante + Logística + Seguridad)
+        # 3. Disparar correo asíncrono vía Office 365
         background_tasks.add_task(
             enviar_correo_solicitud_reclamo,
             destinatario_solicitante=solicitud.correo_institucional,
@@ -176,51 +183,9 @@ def solicitar_reclamo_publico(solicitud: SolicitudReclamoPublica, background_tas
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al procesar la solicitud pública: {str(e)}")
 
-    # Modelo para la solicitud pública desde index.html
-class SolicitudReclamoPublica(BaseModel):
-    codigo_objeto: int
-    nombre_solicitante: str
-    correo_institucional: str
-    telefono_contacto: Optional[str] = None
-
-@app.post("/api/objetos/solicitar-reclamo", tags=["Público"])
-def solicitar_reclamo_publico(solicitud: SolicitudReclamoPublica, background_tasks: BackgroundTasks):
-    try:
-        # 1. Verificar existencia y estado del objeto en Supabase
-        res = supabase.table("objetos").select("*").eq("codigo", solicitud.codigo_objeto).execute()
-        
-        if not res.data:
-            raise HTTPException(status_code=404, detail="El objeto no existe en el catálogo.")
-        
-        objeto = res.data[0]
-        if objeto.get("estado_actual") != "Activo":
-            raise HTTPException(status_code=400, detail="El objeto ya no se encuentra activo.")
-
-        # 2. Empaquetar datos para la notificación por correo
-        datos_correo = {
-            "codigo_objeto": solicitud.codigo_objeto,
-            "nombre_retira": solicitud.nombre_solicitante
-        }
-
-        # 3. Disparar correo asíncrono vía Office 365 (Solicitante + Logística + Seguridad)
-        background_tasks.add_task(
-            enviar_correo_solicitud_reclamo,
-            destinatario_solicitante=solicitud.correo_institucional,
-            datos_baja=datos_correo
-        )
-
-        return {
-            "status": "success",
-            "mensaje": f"Solicitud para el objeto #{solicitud.codigo_objeto} procesada correctamente."
-        }
-    except HTTPException as he:
-        raise he
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error al procesar la solicitud: {str(e)}")
-
-# ------------------------------------------
-# INVENTARIO Y OBJETOS
-# ------------------------------------------
+# ==========================================
+# MÓDULO: INVENTARIO Y OBJETOS
+# ==========================================
 
 @app.get("/api/objetos", tags=["Inventario"])
 def listar_objetos():
@@ -250,7 +215,7 @@ def registrar_objeto(objeto: ObjetoCreate):
 @app.post("/api/objetos/baja", tags=["Trazabilidad"])
 def procesar_salida_objeto(baja: BajaRequest, background_tasks: BackgroundTasks):
     try:
-        # 1. Registrar la trazabilidad de salida en la tabla 'trazabilidad_salidas'
+        # 1. Registrar la trazabilidad de salida
         registro_salida = {
             "codigo_objeto": baja.codigo_objeto,
             "id_funcionario": baja.id_funcionario,
@@ -268,7 +233,7 @@ def procesar_salida_objeto(baja: BajaRequest, background_tasks: BackgroundTasks)
             .eq("codigo", baja.codigo_objeto) \
             .execute()
 
-        # 3. Tarea en segundo plano: envío asíncrono de correo mediante Office 365
+        # 3. Tarea en segundo plano para envío de correo
         if baja.correo_notificacion:
             background_tasks.add_task(
                 enviar_correo_solicitud_reclamo,
@@ -279,3 +244,38 @@ def procesar_salida_objeto(baja: BajaRequest, background_tasks: BackgroundTasks)
         return {"mensaje": f"Objeto #{baja.codigo_objeto} actualizado exitosamente a estado '{baja.tipo_salida}'."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al procesar la salida: {str(e)}")
+
+# ==========================================
+# MÓDULO: GESTIÓN DE USUARIOS (ADMINISTRACIÓN)
+# ==========================================
+
+@app.get("/api/usuarios", tags=["Usuarios"])
+def obtener_usuarios():
+    try:
+        respuesta = supabase.table("usuarios").select("id_usuario, correo, rol, activo").execute()
+        return respuesta.data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al consultar usuarios: {str(e)}")
+
+@app.post("/api/usuarios", tags=["Usuarios"])
+def crear_usuario(usuario: UsuarioCreate):
+    correo_limpio = usuario.correo.strip().lower()
+    try:
+        # Verificar si el correo ya existe
+        existente = supabase.table("usuarios").select("id_usuario").eq("correo", correo_limpio).execute()
+        if existente.data:
+            raise HTTPException(status_code=400, detail="El correo ya se encuentra registrado en el sistema.")
+
+        nuevo_usuario = {
+            "correo": correo_limpio,
+            "password_hash": usuario.contrasena,
+            "rol": usuario.rol,
+            "activo": True
+        }
+        
+        respuesta = supabase.table("usuarios").insert(nuevo_usuario).execute()
+        return {"mensaje": "Usuario registrado exitosamente", "data": respuesta.data[0]}
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al crear usuario: {str(e)}")
