@@ -1,4 +1,5 @@
 import os
+import time
 from typing import Optional, List
 from fastapi import FastAPI, HTTPException, status, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
@@ -6,7 +7,7 @@ from pydantic import BaseModel, EmailStr
 from dotenv import load_dotenv
 from supabase import create_client, Client
 
-# Importar servicio de correo de Office 365
+# Importar servicio de correo electrónico (vía API REST HTTPS)
 from email_service import enviar_correo_solicitud_reclamo
 
 # ==========================================
@@ -20,7 +21,7 @@ SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 if not SUPABASE_URL or not SUPABASE_KEY:
     raise RuntimeError("Faltan las credenciales de Supabase en las variables de entorno.")
 
-# Cliente oficial de Supabase
+# Cliente oficial de Supabase (Instancia global única)
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # ==========================================
@@ -92,11 +93,17 @@ def ruta_raiz():
 
 @app.get("/api/ping-db", tags=["Sistema"])
 def probar_conexion_db():
-    try:
-        respuesta = supabase.table("objetos").select("count", count="exact").execute()
-        return {"mensaje": "Conexión a Supabase exitosa", "total_objetos": respuesta.count}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error al conectar con Supabase: {str(e)}")
+    max_intentos = 3
+    for intento in range(1, max_intentos + 1):
+        try:
+            respuesta = supabase.table("objetos").select("count", count="exact").execute()
+            return {"mensaje": "Conexión a Supabase exitosa", "total_objetos": respuesta.count}
+        except Exception as e:
+            print(f"[ECO-S WARNING] Ping DB intento {intento}/{max_intentos} falló: {str(e)}", flush=True)
+            if intento < max_intentos:
+                time.sleep(0.5)
+            else:
+                raise HTTPException(status_code=500, detail=f"Error al conectar con Supabase: {str(e)}")
 
 # ==========================================
 # MÓDULO: AUTENTICACIÓN
@@ -169,7 +176,7 @@ def solicitar_reclamo_publico(solicitud: SolicitudReclamoPublica, background_tas
             "descripcion": objeto.get("descripcion", "Sin descripción")            
         }
 
-        # 3. Disparar correo asíncrono vía Office 365
+        # 3. Disparar correo asíncrono vía Brevo API REST HTTPS
         background_tasks.add_task(
             enviar_correo_solicitud_reclamo,
             destinatario_solicitante=solicitud.correo_institucional,
@@ -186,44 +193,58 @@ def solicitar_reclamo_publico(solicitud: SolicitudReclamoPublica, background_tas
         raise HTTPException(status_code=500, detail=f"Error al procesar la solicitud pública: {str(e)}")
 
 # ==========================================
-# MÓDULO: INVENTARIO Y OBJETOS
+# MÓDULO: INVENTARIO Y OBJETOS (RESILIENTE)
 # ==========================================
 
 @app.get("/api/objetos", tags=["Inventario"])
 def listar_objetos():
-    try:
-        # 1. Consultar todos los objetos
-        respuesta_obj = supabase.table("objetos").select("*").order("codigo", desc=True).execute()
-        objetos = respuesta_obj.data
+    max_intentos = 3
+    respuesta_obj = None
 
-        # 2. Consultar la tabla de trazabilidad de salidas
-        salidas_dict = {}
+    # 1. Consultar todos los objetos con reintentos automáticos
+    for intento in range(1, max_intentos + 1):
+        try:
+            respuesta_obj = supabase.table("objetos").select("*").order("codigo", desc=True).execute()
+            break
+        except Exception as e:
+            print(f"[ECO-S WARNING] Intento {intento}/{max_intentos} falló al consultar 'objetos': {str(e)}", flush=True)
+            if intento < max_intentos:
+                time.sleep(0.5)
+            else:
+                raise HTTPException(status_code=500, detail="Error de conexión temporal con la base de datos de objetos.")
+
+    objetos = respuesta_obj.data if respuesta_obj else []
+
+    # 2. Consultar la tabla de trazabilidad de salidas con reintentos automáticos
+    salidas_dict = {}
+    for intento in range(1, max_intentos + 1):
         try:
             respuesta_salidas = supabase.table("trazabilidad_salidas").select("*").execute()
             for salida in respuesta_salidas.data:
                 salidas_dict[salida["codigo_objeto"]] = salida
+            break
         except Exception as e_salidas:
-            print("Aviso al consultar trazabilidad_salidas:", str(e_salidas))
+            print(f"[ECO-S WARNING] Intento {intento}/{max_intentos} al consultar 'trazabilidad_salidas': {str(e_salidas)}", flush=True)
+            if intento < max_intentos:
+                time.sleep(0.5)
 
-        # 3. Enriquecer cada objeto con la información de su salida (si aplica)
-        for obj in objetos:
-            salida = salidas_dict.get(obj["codigo"])
-            if salida:
-                obj["nombre_retira"] = salida.get("nombre_retira")
-                obj["categoria_retira"] = salida.get("categoria_retira")
-                obj["funcionario_procesa"] = salida.get("funcionario_turno") or salida.get("nombre_funcionario")
-                obj["fecha_salida"] = salida.get("fecha_salida")
-                obj["hora_salida"] = salida.get("hora_salida")
-            else:
-                obj["nombre_retira"] = None
-                obj["categoria_retira"] = None
-                obj["funcionario_procesa"] = None
-                obj["fecha_salida"] = None
-                obj["hora_salida"] = None
+    # 3. Enriquecer cada objeto con la información de su salida (si aplica)
+    for obj in objetos:
+        salida = salidas_dict.get(obj["codigo"])
+        if salida:
+            obj["nombre_retira"] = salida.get("nombre_retira")
+            obj["categoria_retira"] = salida.get("categoria_retira")
+            obj["funcionario_procesa"] = salida.get("funcionario_turno") or salida.get("nombre_funcionario")
+            obj["fecha_salida"] = salida.get("fecha_salida")
+            obj["hora_salida"] = salida.get("hora_salida")
+        else:
+            obj["nombre_retira"] = None
+            obj["categoria_retira"] = None
+            obj["funcionario_procesa"] = None
+            obj["fecha_salida"] = None
+            obj["hora_salida"] = None
 
-        return objetos
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error al consultar objetos: {str(e)}")
+    return objetos
 
 @app.post("/api/objetos", tags=["Inventario"])
 def registrar_objeto(objeto: ObjetoCreate):
@@ -292,6 +313,7 @@ def procesar_salida_objeto(baja: BajaRequest, background_tasks: BackgroundTasks)
     except Exception as e:
         print("Error crítico en procesar_salida_objeto:", str(e))
         raise HTTPException(status_code=500, detail=f"Error al procesar la salida: {str(e)}")
+
 # ==========================================
 # MÓDULO: GESTIÓN DE USUARIOS (ADMINISTRACIÓN)
 # ==========================================
