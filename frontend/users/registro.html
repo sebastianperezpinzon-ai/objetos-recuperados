@@ -98,14 +98,32 @@
                     <input type="text" id="descripcion" class="form-control" required placeholder="Color, marca, detalles particulares">
                 </div>
 
-                <div class="form-group">
-                    <label for="fotoObjeto">Fotografía del Objeto:</label>
-                    <!-- accept="image/*" habilita el selector nativo (Cámara + Galería) en móviles -->
-                    <input type="file" id="fotoObjeto" accept="image/*" class="input-foto">
-                    <small class="help-text">En dispositivos móviles podrás elegir entre usar la cámara o subir desde la galería.</small>
+                <!-- MÓDULO MEJORADO DE CAPTURA Y CARGA DE FOTOGRAFÍA -->
+                <div class="foto-uploader-container">
+                    <label class="form-label" style="font-weight: 600; margin-bottom: 0.5rem; display: block;">Fotografía del Objeto Recuperado:</label>
+                    
+                    <!-- Botones de Acción Directa -->
+                    <div class="opciones-foto-buttons">
+                        <button type="button" class="btn-foto" onclick="document.getElementById('inputCamara').click();">
+                            📸 Tomar Foto
+                        </button>
+                        <button type="button" class="btn-foto btn-secundario" onclick="document.getElementById('inputGaleria').click();">
+                            🖼️ Cargar de Galería
+                        </button>
+                    </div>
+
+                    <!-- Inputs ocultos para cámara y galería -->
+                    <input type="file" id="inputCamara" accept="image/*" capture="environment" style="display: none;" onchange="procesarFotoSeleccionada(this)">
+                    <input type="file" id="inputGaleria" accept="image/*" style="display: none;" onchange="procesarFotoSeleccionada(this)">
+
+                    <!-- Vista previa de la imagen seleccionada/tomada -->
+                    <div id="previewContainer" class="preview-container" style="display: none;">
+                        <img id="imgPreview" src="" alt="Vista previa del objeto" class="img-preview">
+                        <button type="button" class="btn-eliminar-foto" onclick="limpiarFoto()">✕ Quitar foto</button>
+                    </div>
                 </div>
 
-                <button type="submit" class="btn-primary btn-block">Guardar y Publicar en Catálogo</button>
+                <button type="submit" class="btn-primary btn-block" style="margin-top: 1.5rem;">Guardar y Publicar en Catálogo</button>
             </form>
         </div>
     </div>
@@ -168,6 +186,42 @@
     }
 
     let objetosInventario = [];
+    let archivoFotoSeleccionado = null; // Variable global para almacenar la foto capturada o elegida
+
+    // Procesar selección de foto (Cámara o Galería)
+    function procesarFotoSeleccionada(input) {
+        if (input.files && input.files[0]) {
+            const archivo = input.files[0];
+
+            if (!archivo.type.startsWith('image/')) {
+                alert('Por favor selecciona un archivo de imagen válido.');
+                return;
+            }
+
+            archivoFotoSeleccionado = archivo;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('imgPreview').src = e.target.result;
+                document.getElementById('previewContainer').style.display = 'block';
+            };
+            reader.readAsDataURL(archivo);
+        }
+    }
+
+    // Limpiar selección de foto y ocultar previsualización
+    function limpiarFoto() {
+        archivoFotoSeleccionado = null;
+        const inputCamara = document.getElementById('inputCamara');
+        const inputGaleria = document.getElementById('inputGaleria');
+        const imgPreview = document.getElementById('imgPreview');
+        const previewContainer = document.getElementById('previewContainer');
+
+        if (inputCamara) inputCamara.value = '';
+        if (inputGaleria) inputGaleria.value = '';
+        if (imgPreview) imgPreview.src = '';
+        if (previewContainer) previewContainer.style.display = 'none';
+    }
 
     // Función auxiliar: Lectura asíncrona de la imagen a Base64
     function convertirImagenABase64(archivo) {
@@ -183,13 +237,11 @@
     async function guardarElemento(event) {
         event.preventDefault();
 
-        const inputFoto = document.getElementById('fotoElemento') || document.getElementById('fotoObjeto');
-        const archivo = inputFoto && inputFoto.files ? inputFoto.files[0] : null;
         let cadenaBase64 = null;
 
-        if (archivo) {
+        if (archivoFotoSeleccionado) {
             try {
-                cadenaBase64 = await convertirImagenABase64(archivo);
+                cadenaBase64 = await convertirImagenABase64(archivoFotoSeleccionado);
             } catch (error) {
                 alert('Error al procesar la imagen seleccionada.');
                 return;
@@ -288,6 +340,7 @@
 
     // Modales de Carga
     function abrirModalCarga() {
+        limpiarFoto(); // Limpiar previas capturas al abrir
         const modal = document.getElementById('modalCarga');
         if (modal) modal.style.display = 'flex';
         const fechaInput = document.getElementById('fechaHallazgo');
@@ -299,9 +352,10 @@
         if (modal) modal.style.display = 'none';
         const form = document.getElementById('formSubirElemento');
         if (form) form.reset();
+        limpiarFoto();
     }
 
-    // Abrir modal de salida forzando reseteo completo y bloqueo de sugerencias del navegador
+    // Abrir modal de salida forzando reseteo completo
     function abrirBaja(codigo) {
         const form = document.getElementById('formBaja');
         if (form) form.reset();
@@ -318,7 +372,6 @@
         if (fechaInput) fechaInput.valueAsDate = ahora;
         if (horaInput) horaInput.value = `${String(ahora.getHours()).padStart(2, '0')}:${String(ahora.getMinutes()).padStart(2, '0')}`;
 
-        // Limpieza explícita del campo del funcionario responsable
         const inputFuncionario = document.getElementById('bajaFuncionario');
         if (inputFuncionario) {
             inputFuncionario.value = '';
@@ -352,7 +405,7 @@
             hora_salida: document.getElementById('bajaHora').value,
             categoria_retira: document.getElementById('bajaCategoria').value,
             nombre_retira: document.getElementById('bajaNombre').value,
-            id_funcionario: usuarioActivo.id_usuario // Firma del usuario logueado en la sesión
+            id_funcionario: usuarioActivo.id_usuario
         };
 
         try {
