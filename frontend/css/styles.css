@@ -72,7 +72,6 @@ body {
     background-color: #ffffff;
     color: #005A43;
 }
-
 /* --- Contenedores y Alertas --- */
 .container {
     max-width: 1200px;
@@ -300,6 +299,7 @@ body {
     border-left: 4px solid #F5C6CB;
 }
 
+
 /* =========================================
    Panel de Administración (Dashboard)
    ========================================= */
@@ -428,87 +428,139 @@ body {
 }
 
 .data-table tbody tr:hover {
-    background-color: #F8
+    background-color: #F8F9FA;
+}
 
+/* Botones de acción pequeña en tabla */
+.btn-sm {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.85rem;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    font-weight: bold;
+    color: white;
+}
 
-   /* ==========================================
+.btn-baja { background-color: #6C757D; }
+.btn-edit { background-color: var(--secondary-color); color: #000; }
+.btn-delete { background-color: #d93025; }
+
+/* ==========================================
    ADAPTACIÓN PARA MÓVILES Y TABLETS (≤ 768px)
    ========================================== */
 @media (max-width: 768px) {
-    /* 1. Reestructuración del Layout Dashboard */
-    .dashboard-wrapper {
-        flex-direction: column; /* Pasa de fila horizontal a columna vertical */
-    }
-
-    .sidebar {
-        width: 100%; /* Pasa de 250px fijos a ocupar el 100% del ancho del móvil */
-        box-sizing: border-box;
-        padding: 1rem;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-
-    .sidebar h2 {
-        margin-bottom: 0.75rem;
-        font-size: 1.1rem;
-        padding-bottom: 0.5rem;
-    }
-
-    .sidebar .nav-link {
-        text-align: center;
-        padding: 0.6rem;
-    }
-
-    /* 2. Adaptación del Contenido Principal */
-    .main-content {
-        padding: 1rem; /* Reduce el margen interno excesivo en teléfonos */
-    }
-
-    .header-actions {
+    .navbar {
         flex-direction: column;
-        align-items: stretch;
-        gap: 0.75rem;
+        gap: 15px;
+        padding: 15px 20px;
         text-align: center;
     }
 
-    .header-actions h1 {
-        font-size: 1.3rem;
-    }
-
-    .header-actions .btn-primary {
-        width: 100%;
-        padding: 0.85rem;
-    }
-
-    /* 3. Ajuste de Tarjetas e Indicadores */
-    .stats-grid {
-        grid-template-columns: 1fr; /* Una sola columna para los contadores */
-        gap: 1rem;
-    }
-
-    /* 4. Barra de Filtros y Búsqueda */
-    .filters-bar {
+    .navbar-brand {
         flex-direction: column;
-        gap: 0.75rem;
+        gap: 10px;
     }
 
-    .form-control {
+    .navbar-brand h1 {
+        font-size: 1.2rem;
+        white-space: normal; /* Permite que el título se divida en 2 líneas si la pantalla es muy estrecha */
+        text-align: center;
+    }
+
+    .logo-ean {
+        height: 38px; /* Tamaño optimizado para pantalla móvil */
+    }
+
+    .btn-admin {
         width: 100%;
+        text-align: center;
         box-sizing: border-box;
+        padding: 10px;
     }
+}
 
-    /* 5. Botones del Módulo de Fotografía */
-    .opciones-foto-buttons {
-        flex-direction: column;
-    }
+.table-responsive {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch; /* Desplazamiento suave e inercial en iOS/Android */
+}
+/* =========================================
+   Ventanas Modales (Formularios superpuestos)
+   ========================================= */
 
-    .btn-foto {
-        width: 100%;
-    }
+.modal-overlay {
+    display: none; /* Esta es la línea mágica que oculta el formulario */
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.6);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(3px);
+}
 
-    /* 6. Ventanas Modales en Pantalla Completa Móvil */
-    .modal-content {
-        width: 95%;
-        padding: 1.25rem;
-        max-height: 92vh;
-    }
+.modal-content {
+    background: var(--white);
+    width: 90%;
+    max-width: 500px;
+    border-radius: 8px;
+    padding: 2rem;
+    box-shadow: var(--shadow-md);
+    max-height: 90vh;
+    overflow-y: auto;
+    position: relative;
+    margin: auto; /* Centrado extra de seguridad */
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    border-bottom: 2px solid var(--primary-color);
+    padding-bottom: 0.5rem;
+}
+
+.modal-header h3 {
+    margin: 0;
+    color: var(--primary-color);
+}
+
+.btn-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: var(--text-muted);
+}
+
+.btn-close:hover {
+    color: #d93025;
+}
+
+/* ==========================================================
+   Ecosistema ECO-S: Animación e Identificación Espacial
+   Efecto Hover Zoom para miniaturas de objetos recuperados
+   ========================================================== */
+
+.img-miniatura-zoom {
+    width: 40px;
+    height: 40px;
+    border-radius: 4px;
+    object-fit: cover;
+    transition: transform 0.25s ease-in-out, box-shadow 0.25s ease-in-out;
+    cursor: zoom-in;
+}
+
+/* Ampliación focalizada al pasar el cursor */
+.img-miniatura-zoom:hover {
+    transform: scale(4.5);
+    position: relative;
+    z-index: 1050; /* Garantiza que sobrepase la capa de la tabla */
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35);
+    border-radius: 6px;
 }
