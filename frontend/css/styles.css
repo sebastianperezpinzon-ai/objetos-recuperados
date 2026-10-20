@@ -446,42 +446,39 @@ body {
 .btn-edit { background-color: var(--secondary-color); color: #000; }
 .btn-delete { background-color: #d93025; }
 
-/* Responsividad para móviles */
+/* ==========================================
+   ADAPTACIÓN PARA MÓVILES Y TABLETS (≤ 768px)
+   ========================================== */
 @media (max-width: 768px) {
-    .dashboard-wrapper {
+    .navbar {
         flex-direction: column;
+        gap: 15px;
+        padding: 15px 20px;
+        text-align: center;
     }
-    
-    .sidebar {
+
+    .navbar-brand {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .navbar-brand h1 {
+        font-size: 1.2rem;
+        white-space: normal; /* Permite que el título se divida en 2 líneas si la pantalla es muy estrecha */
+        text-align: center;
+    }
+
+    .logo-ean {
+        height: 38px; /* Tamaño optimizado para pantalla móvil */
+    }
+
+    .btn-admin {
         width: 100%;
-        padding: 1rem;
-        flex-direction: row;
-        flex-wrap: wrap;
-        justify-content: space-between;
-        align-items: center;
-    }
-
-    .sidebar h2 {
-        border-bottom: none;
-        margin-bottom: 0;
-        padding-bottom: 0;
-        width: 100%;
-        text-align: left;
-    }
-
-    .nav-link {
-        display: inline-block;
-        margin-bottom: 0;
-        margin-top: 1rem;
-    }
-
-    .main-content {
-        padding: 1rem;
+        text-align: center;
+        box-sizing: border-box;
+        padding: 10px;
     }
 }
-
-/*-----------------
-
 /* =========================================
    Ventanas Modales (Formularios superpuestos)
    ========================================= */
