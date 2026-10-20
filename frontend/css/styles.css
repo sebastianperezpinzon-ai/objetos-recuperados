@@ -479,6 +479,12 @@ body {
         padding: 10px;
     }
 }
+
+.table-responsive {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch; /* Desplazamiento suave e inercial en iOS/Android */
+}
 /* =========================================
    Ventanas Modales (Formularios superpuestos)
    ========================================= */
