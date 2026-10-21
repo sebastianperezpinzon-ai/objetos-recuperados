@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Declaración de variables globales de Brevo (AQUÍ ESTABA EL FALTANTE)
+# Declaración de variables globales de Brevo
 BREVO_API_KEY = os.getenv("BREVO_API_KEY", "").strip()
 EMAIL_FROM_ADDRESS = os.getenv("EMAIL_FROM_ADDRESS", "").strip()
 EMAIL_FROM_NAME = os.getenv("EMAIL_FROM_NAME", "ECO-S - Universidad EAN").strip()
@@ -17,9 +17,8 @@ CORREOS_INSTITUCIONALES = [
 
 def enviar_correo_solicitud_reclamo(destinatario_solicitante: str, datos_baja: dict):
     """
-    Envía la notificación de reclamación utilizando la API REST v3 de Brevo sobre HTTPS (Puerto 443).
+    Envía la notificación de reclamación optimizada para filtros de spam de Microsoft 365.
     """
-    # Validar que existan las credenciales necesarias
     if not BREVO_API_KEY or not EMAIL_FROM_ADDRESS:
         print("[ECO-S BREVO ERROR] Configuración incompleta: Asegúrate de definir BREVO_API_KEY y EMAIL_FROM_ADDRESS en Render.", flush=True)
         return
@@ -32,44 +31,61 @@ def enviar_correo_solicitud_reclamo(destinatario_solicitante: str, datos_baja: d
     codigo_obj = datos_baja.get("codigo_objeto", "N/A")
     nombre_retira = datos_baja.get("nombre_retira", "Solicitante")
 
-    asunto = f"Solicitud de Reclamación - Objeto #{codigo_obj}"
+    # Asunto optimizado sin caracteres especiales que activen filtros
+    asunto = f"Confirmación de Solicitud de Objeto {codigo_obj} - Universidad EAN"
 
-    cuerpo_texto = f"""Cordial saludo.
+    cuerpo_texto = f"""Cordial saludo, {nombre_retira}.
 
-Se ha generado la solicitud por el elemento "#{codigo_obj}" por parte de "{nombre_retira}".
+Hemos recibido tu solicitud de reclamación para el objeto identificado con el código {codigo_obj} en la plataforma ECO-S.
 
-Recuerda tener el dato del espacio físico o lugar donde lo dejaste y acercarte a la central de seguridad en el sótano 1 de lunes a viernes en los espacios de 9am a 11am y 5pm a 7pm, los sábados de 9am a 12m.
+Pasos para la entrega:
+1. Recuerda el lugar exacto o espacio físico donde dejaste el elemento.
+2. Acércate a la Central de Seguridad ubicada en el Sótano 1 de la universidad.
+3. Horarios de atención:
+   - Lunes a viernes: 9:00 a.m. a 11:00 a.m. y 5:00 p.m. a 7:00 p.m.
+   - Sábados: 9:00 a.m. a 12:00 m.
 
-Si tienes alguna duda puedes escribir un correo a logisyaudio@universidadean.edu.co.
+Si tienes inquietudes sobre este proceso, puedes responder a este correo o escribir a logisyaudio@universidadean.edu.co.
 
-Muchas gracias."""
+Atentamente,
+Gestión de Planta Física y Logística — Universidad EAN"""
 
     cuerpo_html = f"""<!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
     <meta charset="UTF-8">
-    <style>
-        body {{ font-family: 'Segoe UI', Arial, sans-serif; background-color: #f4f6f8; margin: 0; padding: 20px; color: #2c3e50; }}
-        .container {{ max-width: 600px; background-color: #ffffff; margin: 0 auto; padding: 30px; border-radius: 8px; border-top: 5px solid #005A43; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }}
-        p {{ line-height: 1.6; font-size: 1rem; margin-bottom: 15px; }}
-        .footer {{ font-size: 0.82rem; color: #6c757d; border-top: 1px solid #eee; padding-top: 15px; margin-top: 25px; }}
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solicitud de Reclamación ECO-S</title>
 </head>
-<body>
-    <div class="container">
-        <p>Cordial saludo.</p>
-        <p>Se ha generado la solicitud por el elemento "<strong>#{codigo_obj}</strong>" por parte de "<strong>{nombre_retira}</strong>".</p>
-        <p>Recuerda tener el dato del espacio físico o lugar donde lo dejaste y acercarte a la central de seguridad en el sótano 1 de lunes a viernes en los espacios de 9am a 11am y 5pm a 7pm, los sábados de 9am a 12m.</p>
-        <p>Si tienes alguna duda puedes escribir un correo a <a href="mailto:logisyaudio@universidadean.edu.co">logisyaudio@universidadean.edu.co</a>.</p>
-        <p>Muchas gracias.</p>
-        <div class="footer">
-            <p><strong>Ecosistema ECO-S EAN</strong> — Gestión Sostenible de Planta Física y Bienestar Campus (ODS 3, 4, 11 y 12)</p>
+<body style="font-family: 'Segoe UI', Arial, sans-serif; background-color: #f4f6f8; margin: 0; padding: 20px; color: #2c3e50;">
+    <!-- Preheader visible solo en la vista previa del buzón -->
+    <div style="display: none; max-height: 0px; overflow: hidden;">
+        Confirmación de solicitud de entrega para el objeto {codigo_obj} en la Central de Seguridad (Sótano 1).
+    </div>
+
+    <div style="max-width: 600px; background-color: #ffffff; margin: 0 auto; padding: 30px; border-radius: 8px; border-top: 5px solid #005A43; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+        <h2 style="color: #005A43; margin-top: 0; font-size: 1.3rem;">Solicitud de Reclamación Registrada</h2>
+        <p>Cordial saludo, <strong>{nombre_retira}</strong>.</p>
+        <p>Se ha generado la solicitud para la verificación del elemento identificado con el código <strong>{codigo_obj}</strong> en el sistema ECO-S.</p>
+        
+        <div style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid #F2A900; margin: 20px 0; border-radius: 4px;">
+            <p style="margin: 0 0 10px 0; font-weight: bold; color: #005A43;">Pasos para retirar tu objeto:</p>
+            <ul style="margin: 0; padding-left: 20px; font-size: 0.95rem;">
+                <li>Ten presente el espacio físico o aula donde dejaste el elemento.</li>
+                <li>Preséntate en la <strong>Central de Seguridad (Sótano 1)</strong> con tu documento de identidad.</li>
+                <li><strong>Horarios:</strong> Lunes a viernes (9:00 a.m. - 11:00 a.m. / 5:00 p.m. - 7:00 p.m.) y Sábados (9:00 a.m. - 12:00 m.).</li>
+            </ul>
+        </div>
+
+        <p style="font-size: 0.9rem;">Si tienes alguna duda, puedes comunicarte directamente con el equipo de Logística escribiendo a <a href="mailto:logisyaudio@universidadean.edu.co" style="color: #005A43; font-weight: bold;">logisyaudio@universidadean.edu.co</a>.</p>
+        
+        <div style="font-size: 0.8rem; color: #6c757d; border-top: 1px solid #eee; padding-top: 15px; margin-top: 25px;">
+            <p style="margin: 0;"><strong>Ecosistema ECO-S EAN</strong> — Infraestructura, Planta Física y Bienestar Campus (ODS 3, 4, 11 y 12)</p>
         </div>
     </div>
 </body>
 </html>"""
 
-    # Construcción de la carga útil para la API v3 de Brevo
     url = "https://api.brevo.com/v3/smtp/email"
     headers = {
         "accept": "application/json",
@@ -82,6 +98,10 @@ Muchas gracias."""
             "name": EMAIL_FROM_NAME,
             "email": EMAIL_FROM_ADDRESS
         },
+        "replyTo": {
+            "name": "Logística y Audiovisuales EAN",
+            "email": "logisyaudio@universidadean.edu.co"
+        },
         "to": [
             {"email": destinatario_limpio}
         ],
@@ -90,11 +110,16 @@ Muchas gracias."""
         ],
         "subject": asunto,
         "textContent": cuerpo_texto,
-        "htmlContent": cuerpo_html
+        "htmlContent": cuerpo_html,
+        "headers": {
+            "X-Auto-Response-Suppress": "OOF, AutoReply",
+            "X-Report-Abuse-To": "logisyaudio@universidadean.edu.co",
+            "Feedback-ID": "ECO-S-EAN:RECLAMO:BREVO"
+        }
     }
 
     try:
-        print(f"[ECO-S BREVO] Enviando notificación HTTP POST a Brevo para {destinatario_limpio}...", flush=True)
+        print(f"[ECO-S BREVO] Enviando notificación optimizada a Brevo para {destinatario_limpio}...", flush=True)
         response = requests.post(url, json=payload, headers=headers, timeout=10)
 
         if response.status_code in [200, 201]:
