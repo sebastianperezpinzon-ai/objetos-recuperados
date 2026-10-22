@@ -63,7 +63,7 @@ Gestión de Planta Física y Logística — Universidad EAN"""
     <div style="max-width: 600px; background-color: #ffffff; margin: 0 auto; padding: 30px; border-radius: 8px; border-top: 5px solid #005A43; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
         <h2 style="color: #005A43; margin-top: 0; font-size: 1.3rem;">Solicitud de Reclamación Registrada</h2>
         <p>Cordial saludo, <strong>{nombre_retira}</strong>.</p>
-        <p>Se ha generado la solicitud para el elemento identificado con el código <strong>{codigo_obj}</strong> en el sistema ECO-S.</p>
+        <p>Se ha generado la solicitud para el elemento identificado con el código <strong>{codigo_obj}</strong> en el sistema de objetos recuperados.</p>
         
         <div style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid #F2A900; margin: 20px 0; border-radius: 4px;">
             <p style="margin: 0 0 10px 0; font-weight: bold; color: #005A43;">Pasos para retirar tu objeto:</p>
@@ -77,7 +77,7 @@ Gestión de Planta Física y Logística — Universidad EAN"""
         <p style="font-size: 0.9rem;">Si tienes alguna duda, puedes escribir a <a href="mailto:logisyaudio@universidadean.edu.co" style="color: #005A43; font-weight: bold;">logisyaudio@universidadean.edu.co</a>.</p>
         
         <div style="font-size: 0.8rem; color: #6c757d; border-top: 1px solid #eee; padding-top: 15px; margin-top: 25px;">
-            <p style="margin: 0;"><strong>Ecosistema ECO-S EAN</strong> — Infraestructura, Planta Física y Bienestar Campus (ODS 3, 4, 11 y 12)</p>
+            <p style="margin: 0;"><strong>Ecosistema EAN</strong> — Infraestructura, Planta Física y Bienestar Campus</p>
         </div>
     </div>
 </body>
