@@ -8,7 +8,10 @@ from dotenv import load_dotenv
 from supabase import create_client, Client
 
 # Importar servicio de correo electrónico (vía API REST HTTPS)
-from email_service import enviar_correo_solicitud_reclamo
+try:
+    from backend.email_service import enviar_correo_solicitud_reclamo
+except ModuleNotFoundError:
+    from email_service import enviar_correo_solicitud_reclamo
 
 # ==========================================
 # 1. CARGA DE VARIABLES DE ENTORNO Y SUPABASE
