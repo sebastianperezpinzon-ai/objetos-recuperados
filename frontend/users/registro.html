@@ -182,7 +182,7 @@
     // Validar sesión activa del usuario de Registro
     const usuarioActivo = JSON.parse(localStorage.getItem('ecos_usuario_activo'));
     if (!usuarioActivo) {
-        window.location.href = 'login.html';
+        window.location.href = '../login.html';
     }
 
     let objetosInventario = [];
@@ -223,48 +223,46 @@
         if (previewContainer) previewContainer.style.display = 'none';
     }
 
-    // Función auxiliar: Lectura asíncrona de la imagen a Base64
-    // Convierte y comprime la imagen a máximo 800px de ancho/alto con calidad optimizada
-function convertirImagenABase64(archivo) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(archivo);
-        reader.onload = (event) => {
-            const img = new Image();
-            img.src = event.target.result;
-            img.onload = () => {
-                const canvas = document.createElement('canvas');
-                const MAX_WIDTH = 800; // Ancho máximo suficiente para el catálogo
-                const MAX_HEIGHT = 800;
-                let width = img.width;
-                let height = img.height;
+    // Convierte y comprime la imagen a máximo 600px de ancho/alto con calidad optimizada
+    function convertirImagenABase64(archivo) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(archivo);
+            reader.onload = (event) => {
+                const img = new Image();
+                img.src = event.target.result;
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const MAX_WIDTH = 600;
+                    const MAX_HEIGHT = 600;
+                    let width = img.width;
+                    let height = img.height;
 
-                if (width > height) {
-                    if (width > MAX_WIDTH) {
-                        height *= MAX_WIDTH / width;
-                        width = MAX_WIDTH;
+                    if (width > height) {
+                        if (width > MAX_WIDTH) {
+                            height *= MAX_WIDTH / width;
+                            width = MAX_WIDTH;
+                        }
+                    } else {
+                        if (height > MAX_HEIGHT) {
+                            width *= MAX_HEIGHT / height;
+                            height = MAX_HEIGHT;
+                        }
                     }
-                } else {
-                    if (height > MAX_HEIGHT) {
-                        width *= MAX_HEIGHT / height;
-                        height = MAX_HEIGHT;
-                    }
-                }
 
-                canvas.width = width;
-                canvas.height = height;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, width, height);
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
 
-                // Comprimir a formato JPEG con 60% de calidad
-                const base64Comprimido = canvas.toDataURL('image/jpeg', 0.6);
-                resolve(base64Comprimido);
+                    const base64Comprimido = canvas.toDataURL('image/jpeg', 0.5);
+                    resolve(base64Comprimido);
+                };
+                img.onerror = (error) => reject(error);
             };
-            img.onerror = (error) => reject(error);
-        };
-        reader.onerror = (error) => reject(error);
-    });
-}
+            reader.onerror = (error) => reject(error);
+        });
+    }
 
     // Registrar objeto desde el panel de Registro
     async function guardarElemento(event) {
@@ -319,12 +317,10 @@ function convertirImagenABase64(archivo) {
 
             objetosInventario = await response.json();
             
-            // Actualizar indicador de objetos activos en la interfaz
             const activosCount = objetosInventario.filter(obj => obj.estado_actual === 'Activo').length;
             const elemContador = document.getElementById('contadorActivos');
             if (elemContador) elemContador.innerText = activosCount;
 
-            // Filtrado dinámico por búsqueda
             const terminoBusqueda = document.getElementById('buscadorCodigo') ? document.getElementById('buscadorCodigo').value.trim().toLowerCase().replace('#', '') : "";
             
             const filtrados = objetosInventario.filter(obj => {
@@ -365,15 +361,13 @@ function convertirImagenABase64(archivo) {
         }
     }
 
-    // Event listener para búsqueda en tiempo real
     const inputBuscador = document.getElementById('buscadorCodigo');
     if (inputBuscador) {
         inputBuscador.addEventListener('input', cargarTablaRegistro);
     }
 
-    // Modales de Carga
     function abrirModalCarga() {
-        limpiarFoto(); // Limpiar previas capturas al abrir
+        limpiarFoto();
         const modal = document.getElementById('modalCarga');
         if (modal) modal.style.display = 'flex';
         const fechaInput = document.getElementById('fechaHallazgo');
@@ -388,7 +382,6 @@ function convertirImagenABase64(archivo) {
         limpiarFoto();
     }
 
-    // Abrir modal de salida forzando reseteo completo
     function abrirBaja(codigo) {
         const form = document.getElementById('formBaja');
         if (form) form.reset();
@@ -438,6 +431,7 @@ function convertirImagenABase64(archivo) {
             hora_salida: document.getElementById('bajaHora').value,
             categoria_retira: document.getElementById('bajaCategoria').value,
             nombre_retira: document.getElementById('bajaNombre').value,
+            funcionario_entrega: funcionarioTurno, // 👈 Se agrega la propiedad faltante
             id_funcionario: usuarioActivo.id_usuario
         };
 
