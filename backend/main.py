@@ -64,8 +64,9 @@ class BajaRequest(BaseModel):
     hora_salida: str
     categoria_retira: str
     nombre_retira: str
-    id_funcionario: int  # Trazabilidad Operativa
-    funcionario_turno: Optional[str] = None  # Nombre del funcionario responsable en turno
+    id_funcionario: Optional[int] = None  # Trazabilidad Operativa
+    funcionario_turno: Optional[str] = None  # Compatible con ambas sintaxis
+    funcionario_entrega: Optional[str] = None  # Nombre enviado desde registro.html
     correo_notificacion: Optional[str] = None
 
 class SolicitudReclamoPublica(BaseModel):
@@ -159,7 +160,6 @@ def autenticar_usuario(datos: LoginRequest):
 @app.post("/api/objetos/solicitar-reclamo", tags=["Público"])
 def solicitar_reclamo_publico(solicitud: SolicitudReclamoPublica, background_tasks: BackgroundTasks):
     try:
-        # 1. Verificar existencia y estado activo del objeto
         res = supabase.table("objetos").select("*").eq("codigo", solicitud.codigo_objeto).execute()
         
         if not res.data:
@@ -169,14 +169,12 @@ def solicitar_reclamo_publico(solicitud: SolicitudReclamoPublica, background_tas
         if objeto.get("estado_actual") != "Activo":
             raise HTTPException(status_code=400, detail="Este objeto ya fue procesado o entregado previamente.")
 
-        # 2. Empaquetar datos para la notificación por correo
         datos_correo = {
             "codigo_objeto": objeto.get("codigo"),
             "nombre_retira": solicitud.nombre_solicitante,
             "descripcion": objeto.get("descripcion", "Sin descripción")            
         }
 
-        # 3. Disparar correo asíncrono vía Brevo API REST HTTPS
         background_tasks.add_task(
             enviar_correo_solicitud_reclamo,
             destinatario_solicitante=solicitud.correo_institucional,
@@ -193,7 +191,7 @@ def solicitar_reclamo_publico(solicitud: SolicitudReclamoPublica, background_tas
         raise HTTPException(status_code=500, detail=f"Error al procesar la solicitud pública: {str(e)}")
 
 # ==========================================
-# MÓDULO: INVENTARIO Y OBJETOS (RESILIENTE)
+# MÓDULO: INVENTARIO Y OBJETOS
 # ==========================================
 
 @app.get("/api/objetos", tags=["Inventario"])
@@ -201,7 +199,6 @@ def listar_objetos():
     max_intentos = 3
     respuesta_obj = None
 
-    # 1. Consultar todos los objetos con reintentos automáticos
     for intento in range(1, max_intentos + 1):
         try:
             respuesta_obj = supabase.table("objetos").select("*").order("codigo", desc=True).execute()
@@ -215,7 +212,6 @@ def listar_objetos():
 
     objetos = respuesta_obj.data if respuesta_obj else []
 
-    # 2. Consultar la tabla de trazabilidad de salidas con reintentos automáticos
     salidas_dict = {}
     for intento in range(1, max_intentos + 1):
         try:
@@ -228,13 +224,12 @@ def listar_objetos():
             if intento < max_intentos:
                 time.sleep(0.5)
 
-    # 3. Enriquecer cada objeto con la información de su salida (si aplica)
     for obj in objetos:
         salida = salidas_dict.get(obj["codigo"])
         if salida:
             obj["nombre_retira"] = salida.get("nombre_retira")
             obj["categoria_retira"] = salida.get("categoria_retira")
-            obj["funcionario_procesa"] = salida.get("funcionario_turno") or salida.get("nombre_funcionario")
+            obj["funcionario_procesa"] = salida.get("funcionario_turno") or salida.get("nombre_funcionario") or salida.get("funcionario_entrega")
             obj["fecha_salida"] = salida.get("fecha_salida")
             obj["hora_salida"] = salida.get("hora_salida")
         else:
@@ -266,7 +261,9 @@ def registrar_objeto(objeto: ObjetoCreate):
 @app.post("/api/objetos/baja", tags=["Trazabilidad"])
 def procesar_salida_objeto(baja: BajaRequest, background_tasks: BackgroundTasks):
     try:
-        # 1. Preparar datos base de trazabilidad
+        # Resolver nombre de funcionario responsable sin importar la clave enviada
+        funcionario_responsable = baja.funcionario_entrega or baja.funcionario_turno
+
         registro_salida = {
             "codigo_objeto": baja.codigo_objeto,
             "id_funcionario": baja.id_funcionario,
@@ -277,45 +274,44 @@ def procesar_salida_objeto(baja: BajaRequest, background_tasks: BackgroundTasks)
             "nombre_retira": baja.nombre_retira
         }
 
-        # Incluir funcionario_turno si viene en la petición
-        if baja.funcionario_turno:
-            registro_salida["funcionario_turno"] = baja.funcionario_turno
+        if funcionario_responsable:
+            registro_salida["funcionario_turno"] = funcionario_responsable
 
-        # Intentar inserción con gestión de tolerancias
         try:
             supabase.table("trazabilidad_salidas").insert(registro_salida).execute()
         except Exception as e_ins:
-            print("Aviso: Reintentando inserción sin 'funcionario_turno':", str(e_ins))
+            print("[ECO-S WARNING] Reintentando inserción sin 'funcionario_turno':", str(e_ins))
             registro_salida.pop("funcionario_turno", None)
             
             try:
                 supabase.table("trazabilidad_salidas").insert(registro_salida).execute()
             except Exception as e_fk:
-                print("Aviso: Reintentando inserción omitiendo id_funcionario:", str(e_fk))
+                print("[ECO-S WARNING] Reintentando inserción omitiendo id_funcionario:", str(e_fk))
                 registro_salida["id_funcionario"] = None
                 supabase.table("trazabilidad_salidas").insert(registro_salida).execute()
 
-        # 2. Actualizar el estado del objeto en la tabla 'objetos'
+        # Actualizar estado del objeto
         supabase.table("objetos") \
             .update({"estado_actual": baja.tipo_salida}) \
             .eq("codigo", baja.codigo_objeto) \
             .execute()
 
-        # 3. Notificación por correo en segundo plano
+        # Notificación por correo en segundo plano
         if baja.correo_notificacion:
+            dict_baja = baja.model_dump() if hasattr(baja, 'model_dump') else baja.dict()
             background_tasks.add_task(
                 enviar_correo_solicitud_reclamo,
                 destinatario_solicitante=baja.correo_notificacion,
-                datos_baja=baja.dict()
+                datos_baja=dict_baja
             )
 
         return {"mensaje": f"Objeto #{baja.codigo_objeto} actualizado exitosamente a estado '{baja.tipo_salida}'."}
     except Exception as e:
-        print("Error crítico en procesar_salida_objeto:", str(e))
+        print("[ECO-S ERROR] Error crítico en procesar_salida_objeto:", str(e))
         raise HTTPException(status_code=500, detail=f"Error al procesar la salida: {str(e)}")
 
 # ==========================================
-# MÓDULO: GESTIÓN DE USUARIOS (ADMINISTRACIÓN)
+# MÓDULO: GESTIÓN DE USUARIOS
 # ==========================================
 
 @app.get("/api/usuarios", tags=["Usuarios"])
@@ -330,7 +326,6 @@ def obtener_usuarios():
 def crear_usuario(usuario: UsuarioCreate):
     correo_limpio = usuario.correo.strip().lower()
     try:
-        # Verificar si el correo ya existe
         existente = supabase.table("usuarios").select("id_usuario").eq("correo", correo_limpio).execute()
         if existente.data:
             raise HTTPException(status_code=400, detail="El correo ya se encuentra registrado en el sistema.")
