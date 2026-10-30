@@ -10,13 +10,13 @@
 <body>
 
     <!-- Encabezado -->
-   <header class="navbar">
-    <div class="navbar-brand">
-        <img src="logo u.png" alt="Logo Universidad EAN" class="logo-ean">
-        <h1>Tu Objeto Recuperado EAN</h1>
-    </div>
-    <a href="login.html" class="btn-admin">Acceso Administrativo</a>
-</header>
+    <header class="navbar">
+        <div class="navbar-brand">
+            <img src="logo u.png" alt="Logo Universidad EAN" class="logo-ean">
+            <h1>Tu Objeto Recuperado EAN</h1>
+        </div>
+        <a href="login.html" class="btn-admin">Acceso Administrativo</a>
+    </header>
 
     <main class="container">
         <!-- Instrucciones Pedagógicas -->
@@ -86,13 +86,17 @@
         // Variable global para mantener el inventario traído desde Supabase
         let objetosInventario = [];
 
+        // Definir la URL base de tu backend desplegado en Vercel
+        const API_BASE_URL = 'https://objetos-recuperados-backend.vercel.app'; 
+
         // ==========================================
         // 1. Cargar Objetos desde la API REST (FastAPI / Supabase)
         // ==========================================
         async function cargarObjetosDesdeAPI() {
             const contenedor = document.getElementById('catalogoPublico');
             try {
-                const response = await fetch('https://objetos-recuperados-frontend.vercel.app');
+                // 👈 Se agrega el endpoint /api/objetos
+                const response = await fetch(`${API_BASE_URL}/api/objetos`); 
                 if (!response.ok) throw new Error('Error al conectar con la base de datos');
 
                 objetosInventario = await response.json();
@@ -116,7 +120,7 @@
             const contenedor = document.getElementById('catalogoPublico');
             if (!contenedor) return;
             
-            contenedor.innerHTML = ''; // Limpiar la cuadrícula
+            contenedor.innerHTML = '';
 
             if (listaObjetos.length === 0) {
                 contenedor.innerHTML = `
@@ -127,7 +131,6 @@
                 return;
             }
 
-            // Construcción de cada tarjeta
             listaObjetos.forEach(objeto => {
                 const tarjeta = document.createElement('article');
                 tarjeta.className = 'object-card';
@@ -159,7 +162,6 @@
             const fechaFiltro = document.getElementById('filtroFecha').value;
             const clasificacionFiltro = document.getElementById('filtroClasificacion').value;
 
-            // Filtra únicamente los elementos activos provenientes de la API
             const filtrados = objetosInventario.filter(obj => {
                 const esActivo = obj.estado_actual === 'Activo';
                 const coincideFecha = fechaFiltro === "" || obj.fecha_hallazgo === fechaFiltro;
@@ -178,7 +180,7 @@
         }
 
         // ==========================================
-        // 4. Flujo de Reclamación (Conectado a FastAPI y Office 365)
+        // 4. Flujo de Reclamación
         // ==========================================
         const modalReclamo = document.getElementById('modalReclamo');
         const formReclamo = document.getElementById('formReclamo');
@@ -195,40 +197,41 @@
         }
 
         async function procesarReclamo(event) {
-    event.preventDefault();
+            event.preventDefault();
 
-    const codigoObjeto = parseInt(document.getElementById('reclamoCodigoElemento').value);
-    const nombreSolicitante = document.getElementById('reclamoNombre').value.trim();
-    const correoInstitucional = document.getElementById('reclamoCorreo').value.trim();
-    const telefonoContacto = document.getElementById('reclamoContacto').value.trim();
+            const codigoObjeto = parseInt(document.getElementById('reclamoCodigoElemento').value);
+            const nombreSolicitante = document.getElementById('reclamoNombre').value.trim();
+            const correoInstitucional = document.getElementById('reclamoCorreo').value.trim();
+            const telefonoContacto = document.getElementById('reclamoContacto').value.trim();
 
-    const payload = {
-        codigo_objeto: codigoObjeto,
-        nombre_solicitante: nombreSolicitante,
-        correo_institucional: correoInstitucional,
-        telefono_contacto: telefonoContacto
-    };
+            const payload = {
+                codigo_objeto: codigoObjeto,
+                nombre_solicitante: nombreSolicitante,
+                correo_institucional: correoInstitucional,
+                telefono_contacto: telefonoContacto
+            };
 
-    try {
-        const response = await fetch('https://objetos-recuperadosean.onrender.com/api/objetos/solicitar-reclamo', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
+            try {
+                // 👈 Se agrega el endpoint /api/objetos/solicitar-reclamo
+                const response = await fetch(`${API_BASE_URL}/api/objetos/solicitar-reclamo`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
 
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.detail || 'Error al procesar la solicitud');
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || 'Error al procesar la solicitud');
+                }
+
+                alert(`¡Solicitud enviada exitosamente, ${nombreSolicitante}!\n\nRevisa tu correo (${correoInstitucional}) con las instrucciones para acercarte al Sótano 1.\n\nLogística y Seguridad han sido notificados.`);
+
+                cerrarModalReclamo();
+            } catch (error) {
+                console.error("Error al procesar la solicitud:", error);
+                alert(`Hubo un problema al enviar tu solicitud: ${error.message}`);
+            }
         }
-
-        alert(`¡Solicitud enviada exitosamente, ${nombreSolicitante}!\n\nRevisa tu correo (${correoInstitucional}) con las instrucciones para acercarte al Sótano 1.\n\nLogística y Seguridad han sido notificados.`);
-
-        cerrarModalReclamo();
-    } catch (error) {
-        console.error("Error al procesar la solicitud:", error);
-        alert(`Hubo un problema al enviar tu solicitud: ${error.message}`);
-    }
-}
 
         // Inicialización
         window.onload = function() {
