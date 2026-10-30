@@ -87,7 +87,8 @@
         let objetosInventario = [];
 
         // Definir la URL base de tu backend desplegado en Vercel
-        const API_BASE_URL = 'https://objetos-recuperados-backend.vercel.app'; 
+        // En index.html (y demás archivos HTML)
+        const API_BASE_URL = ''; // Al dejarlo vacío, usará automáticamente la misma URL de Vercel
 
         // ==========================================
         // 1. Cargar Objetos desde la API REST (FastAPI / Supabase)
@@ -96,7 +97,7 @@
             const contenedor = document.getElementById('catalogoPublico');
             try {
                 // 👈 Se agrega el endpoint /api/objetos
-                const response = await fetch(`${API_BASE_URL}/api/objetos`); 
+                const response = await fetch(`${API_BASE_URL}/api/objetos`);
                 if (!response.ok) throw new Error('Error al conectar con la base de datos');
 
                 objetosInventario = await response.json();
@@ -213,7 +214,7 @@
 
             try {
                 // 👈 Se agrega el endpoint /api/objetos/solicitar-reclamo
-                const response = await fetch(`${API_BASE_URL}/api/objetos/solicitar-reclamo`, {
+                const response = await fetch(`${API_BASE_URL}/api/objetos/solicitar-reclamo`, { 
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
