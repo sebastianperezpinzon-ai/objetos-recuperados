@@ -92,7 +92,7 @@
         async function cargarObjetosDesdeAPI() {
             const contenedor = document.getElementById('catalogoPublico');
             try {
-                const response = await fetch('https://objetos-recuperadosean.onrender.com/api/objetos');
+                const response = await fetch('https://objetos-recuperados-frontend.vercel.app');
                 if (!response.ok) throw new Error('Error al conectar con la base de datos');
 
                 objetosInventario = await response.json();
