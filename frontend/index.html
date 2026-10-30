@@ -198,41 +198,41 @@
         }
 
         async function procesarReclamo(event) {
-            event.preventDefault();
+    event.preventDefault();
 
-            const codigoObjeto = parseInt(document.getElementById('reclamoCodigoElemento').value);
-            const nombreSolicitante = document.getElementById('reclamoNombre').value.trim();
-            const correoInstitucional = document.getElementById('reclamoCorreo').value.trim();
-            const telefonoContacto = document.getElementById('reclamoContacto').value.trim();
+    const codigoObjeto = parseInt(document.getElementById('reclamoCodigoElemento').value);
+    const nombreSolicitante = document.getElementById('reclamoNombre').value.trim();
+    const correoInstitucional = document.getElementById('reclamoCorreo').value.trim();
+    const telefonoContacto = document.getElementById('reclamoContacto').value.trim();
 
-            const payload = {
-                codigo_objeto: codigoObjeto,
-                nombre_solicitante: nombreSolicitante,
-                correo_institucional: correoInstitucional,
-                telefono_contacto: telefonoContacto
-            };
+    const payload = {
+        codigo_objeto: codigoObjeto,
+        nombre_solicitante: nombreSolicitante,
+        correo_institucional: correoInstitucional,
+        telefono_contacto: telefonoContacto
+    };
 
-            try {
-                // 👈 Se agrega el endpoint /api/objetos/solicitar-reclamo
-                const response = await fetch(`${API_BASE_URL}/api/objetos/solicitar-reclamo`, { 
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
+    try {
+        // Llama a la ruta relativa en Vercel
+        const response = await fetch(`${API_BASE_URL}/api/objetos/solicitar-reclamo`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
 
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.detail || 'Error al procesar la solicitud');
-                }
-
-                alert(`¡Solicitud enviada exitosamente, ${nombreSolicitante}!\n\nRevisa tu correo (${correoInstitucional}) con las instrucciones para acercarte al Sótano 1.\n\nLogística y Seguridad han sido notificados.`);
-
-                cerrarModalReclamo();
-            } catch (error) {
-                console.error("Error al procesar la solicitud:", error);
-                alert(`Hubo un problema al enviar tu solicitud: ${error.message}`);
-            }
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.detail || 'Error al procesar la solicitud');
         }
+
+        alert(`¡Solicitud enviada exitosamente, ${nombreSolicitante}!\n\nRevisa tu correo (${correoInstitucional}) con las instrucciones para acercarte a la Central de Seguridad en el Sótano 1.`);
+
+        cerrarModalReclamo();
+    } catch (error) {
+        console.error("Error al procesar la solicitud:", error);
+        alert(`Hubo un problema al enviar tu solicitud: ${error.message}`);
+    }
+}
 
         // Inicialización
         window.onload = function() {
