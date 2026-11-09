@@ -41,57 +41,60 @@
     </main>
 
     <script>
+        // URL base para entorno Serverless en Vercel (Ruta relativa)
+        const API_BASE_URL = '';
+
         async function procesarLogin(event) {
-    event.preventDefault(); // Evita el recargado de la página
-    
-    const correoInput = document.getElementById('correoUsuario').value.trim().toLowerCase();
-    const passwordInput = document.getElementById('passwordUsuario').value;
-    const errorDiv = document.getElementById('mensajeError');
+            event.preventDefault(); // Evita el recargado de la página
+            
+            const correoInput = document.getElementById('correoUsuario').value.trim().toLowerCase();
+            const passwordInput = document.getElementById('passwordUsuario').value;
+            const errorDiv = document.getElementById('mensajeError');
 
-    // Limpiamos mensajes de error previos
-    errorDiv.style.display = 'none';
+            // Limpiamos mensajes de error previos
+            errorDiv.style.display = 'none';
 
-    try {
-        // 1. Petición HTTP POST a la API en FastAPI
-        const response = await fetch('https://objetos-recuperadosean.onrender.com/api/auth/login', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                correo: correoInput,
-                password: passwordInput
-            })
-        });
+            try {
+                // 1. Petición HTTP POST a la API en FastAPI vía Vercel
+                const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        correo: correoInput,
+                        password: passwordInput
+                    })
+                });
 
-        const data = await response.json();
+                const data = await response.json();
 
-        // 2. Si la API responde con error (401, 403, 422, etc.)
-        if (!response.ok) {
-            throw new Error(data.detail || 'Credenciales incorrectas o usuario no autorizado.');
+                // 2. Si la API responde con error (401, 403, 422, etc.)
+                if (!response.ok) {
+                    throw new Error(data.detail || 'Credenciales incorrectas o usuario no autorizado.');
+                }
+
+                // 3. Almacenamos la sesión del usuario activo
+                localStorage.setItem('ecos_usuario_activo', JSON.stringify(data.usuario));
+
+                console.log(`Sesión iniciada: ${data.usuario.correo} | Rol: ${data.usuario.rol}`);
+
+                // 4. Enrutamiento según el rol devuelto por la base de datos
+                const rol = data.usuario.rol;
+                if (rol === 'Administrador') {
+                    window.location.href = 'users/administrator.html';
+                } else if (rol === 'Técnico') {
+                    window.location.href = 'users/tecnico.html';
+                } else if (rol === 'Registro') {
+                    window.location.href = 'users/registro.html';
+                }
+
+            } catch (error) {
+                // Muestra el mensaje devuelto por FastAPI en la interfaz
+                errorDiv.innerText = error.message;
+                errorDiv.style.display = 'block';
+            }
         }
-
-        // 3. Almacenamos la sesión del usuario activo (incluye su id_usuario para trazabilidad)
-        localStorage.setItem('ecos_usuario_activo', JSON.stringify(data.usuario));
-
-        console.log(`Sesión iniciada: ${data.usuario.correo} | Rol: ${data.usuario.rol}`);
-
-        // 4. Enrutamiento según el rol devuelto por la base de datos
-        const rol = data.usuario.rol;
-        if (rol === 'Administrador') {
-            window.location.href = 'users/administrator.html';
-        } else if (rol === 'Técnico') {
-            window.location.href = 'users/tecnico.html';
-        } else if (rol === 'Registro') {
-            window.location.href = 'users/registro.html';
-        }
-
-    } catch (error) {
-        // Muestra el mensaje devuelto por FastAPI en la interfaz
-        errorDiv.innerText = error.message;
-        errorDiv.style.display = 'block';
-    }
-}
     </script>
 </body>
 </html>
