@@ -9,8 +9,6 @@
 <body>
 
     <div class="dashboard-wrapper">
-        
-        <!-- Menú Lateral -->
         <nav class="sidebar">
             <h2>Admin ECO-S</h2>
             <a href="#" class="nav-link active" onclick="cambiarVista('vistaInventario', this)">Inventario Activo</a>
@@ -19,12 +17,7 @@
             <a href="../index.html" class="nav-link btn-logout">Cerrar Sesión</a>
         </nav>
 
-        <!-- Contenido Principal -->
         <main class="main-content">
-            
-            <!-- ========================================== -->
-            <!-- VISTA 1: INVENTARIO (Visible por defecto)  -->
-            <!-- ========================================== -->
             <div id="vistaInventario">
                 <div class="header-actions">
                     <h1>Gestión de Objetos Recuperados</h1>
@@ -33,7 +26,6 @@
                     </div>
                 </div>
 
-                <!-- Panel de Indicadores Operativos -->
                 <div class="stats-grid">
                     <div class="stat-card">
                         <h3 id="contadorActivos">--</h3>
@@ -49,7 +41,6 @@
                     </div>
                 </div>
                 
-                <!-- Barra de Filtros Administrativos -->
                 <div class="filters-bar" style="margin-bottom: 1.5rem; background: var(--white); padding: 1rem; border-radius: 8px; box-shadow: var(--shadow-sm);">
                     <input type="text" id="buscadorCodigo" class="form-control" placeholder="🔍 Buscar por código (Ej: 1001)" autocomplete="off">
                     <select id="filtroEstado" class="form-control">
@@ -58,7 +49,6 @@
                     </select>
                 </div>
                 
-                <!-- Tabla de Inventario -->
                 <div class="table-container">
                     <table class="data-table">
                         <thead>
@@ -76,11 +66,10 @@
                         <tbody id="cuerpoTablaAdmin"></tbody>
                     </table>
                 </div>
+
+                <div id="paginacionAdmin" class="pagination-wrapper"></div>
             </div>
 
-            <!-- ========================================== -->
-            <!-- VISTA 2: GESTIÓN DE USUARIOS (Oculta)      -->
-            <!-- ========================================== -->
             <div id="vistaUsuarios" style="display: none;">
                 <div class="header-actions">
                     <h1>Control de Accesos Operativos</h1>
@@ -107,15 +96,9 @@
                     </table>
                 </div>
             </div>
-
         </main>
     </div>
 
-    <!-- ========================================== -->
-    <!-- MODALES                                    -->
-    <!-- ========================================== -->
-    
-    <!-- Modal: Subir Elemento -->
     <div id="modalCarga" class="modal-overlay">
         <div class="modal-content">
             <div class="modal-header">
@@ -144,7 +127,6 @@
         </div>
     </div>
 
-    <!-- Modal: Dar de Baja / Procesar Salida -->
     <div id="modalBaja" class="modal-overlay">
         <div class="modal-content">
             <div class="modal-header">
@@ -183,7 +165,6 @@
                     <input type="text" id="bajaNombre" class="form-control" required placeholder="Ej: Juan Pérez" autocomplete="off">
                 </div>
 
-                <!-- Campo manual obligatorio para firmas por turno -->
                 <div class="form-group" style="border-top: 1px dashed #ccc; padding-top: 1rem; margin-top: 1rem;">
                     <label style="color: var(--primary-color, #005A43); font-weight: bold;">Funcionario que procesa la salida (Responsable en turno) *</label>
                     <input type="text" id="bajaFuncionario" class="form-control" required placeholder="Nombre del colaborador en turno" autocomplete="new-password">
@@ -194,7 +175,6 @@
         </div>
     </div>
 
-    <!-- Modal: Crear Usuario -->
     <div id="modalUsuario" class="modal-overlay">
         <div class="modal-content">
             <div class="modal-header">
@@ -224,74 +204,112 @@
         </div>
     </div>
 
-    <!-- Librería para Excel -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
     <script>
-    // URL base para entorno Serverless en Vercel (Ruta relativa)
-    const API_BASE_URL = '';
+        const API_BASE_URL = '';
+        const ITEMS_POR_PAGINA_ADMIN = 15;
 
-    // ==========================================
-    // 0. Sesión y Autenticación del Administrador
-    // ==========================================
-    const usuarioActivo = JSON.parse(localStorage.getItem('ecos_usuario_activo'));
+        const usuarioActivo = JSON.parse(localStorage.getItem('ecos_usuario_activo'));
+        if (!usuarioActivo) {
+            window.location.href = '../login.html';
+        }
 
-    if (!usuarioActivo) {
-        window.location.href = 'login.html';
-    } else {
-        console.log(`Sesión activa: ${usuarioActivo.correo} (ID: ${usuarioActivo.id_usuario})`);
-    }
+        let objetosInventario = [];
+        let paginaActualAdmin = 1;
 
-    // Variable global para mantener los objetos traídos de Supabase
-    let objetosInventario = [];
+        function cambiarVista(idVista, elementoMenu) {
+            document.getElementById('vistaInventario').style.display = 'none';
+            document.getElementById('vistaUsuarios').style.display = 'none';
+            document.getElementById(idVista).style.display = 'block';
 
-    // ==========================================
-    // 1. Navegación de Vistas (Pestañas)
-    // ==========================================
-    function cambiarVista(idVista, elementoMenu) {
-        document.getElementById('vistaInventario').style.display = 'none';
-        document.getElementById('vistaUsuarios').style.display = 'none';
-        
-        document.getElementById(idVista).style.display = 'block';
+            document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
+            elementoMenu.classList.add('active');
 
-        document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
-        elementoMenu.classList.add('active');
+            if (idVista === 'vistaUsuarios') cargarTablaUsuarios();
+            if (idVista === 'vistaInventario') cargarTablaAdmin();
+        }
 
-        if (idVista === 'vistaUsuarios') cargarTablaUsuarios();
-        if (idVista === 'vistaInventario') cargarTablaAdmin();
-    }
+        function generarBotonesPaginacion(contenedorId, totalItems, paginaActual, itemsPorPagina, callbackCambioPagina) {
+            const contenedor = document.getElementById(contenedorId);
+            if (!contenedor) return;
 
-    // ==========================================
-    // 2. Módulo Inventario: Conexión a FastAPI
-    // ==========================================
-    
-    // Contadores de la parte superior
-    function actualizarContadores(inventario) {
-        const elemActivos = document.getElementById('contadorActivos');
-        const elemReclamados = document.getElementById('contadorReclamados');
-        const elemBajas = document.getElementById('contadorBajas');
+            const totalPaginas = Math.ceil(totalItems / itemsPorPagina);
+            if (totalPaginas <= 1) {
+                contenedor.innerHTML = totalItems > 0 
+                    ? `<span class="pagination-info">Mostrando ${totalItems} registro(s)</span>` 
+                    : '';
+                return;
+            }
 
-        if (elemActivos) elemActivos.innerText = inventario.filter(obj => obj.estado_actual === 'Activo').length;
-        if (elemReclamados) elemReclamados.innerText = inventario.filter(obj => obj.estado_actual === 'Reclamado').length;
-        if (elemBajas) elemBajas.innerText = inventario.filter(obj => obj.estado_actual === 'Baja').length;
-    }
+            const inicio = (paginaActual - 1) * itemsPorPagina + 1;
+            const fin = Math.min(paginaActual * itemsPorPagina, totalItems);
 
-    // Cargar y filtrar la tabla de inventario desde Supabase
-    async function cargarTablaAdmin() {
-        const tbody = document.getElementById('cuerpoTablaAdmin');
-        if (!tbody) return;
+            let html = `<span class="pagination-info">Mostrando <strong>${inicio}–${fin}</strong> de <strong>${totalItems}</strong> registros</span>`;
+            html += `<div class="pagination-controls">`;
+            html += `<button class="page-btn" ${paginaActual === 1 ? 'disabled' : ''} onclick="${callbackCambioPagina}(${paginaActual - 1})">« Anterior</button>`;
 
-        try {
-            const response = await fetch(`${API_BASE_URL}/api/objetos`);
-            if (!response.ok) throw new Error('Error al consultar la base de datos');
-            
-            objetosInventario = await response.json();
-            
+            const paginas = [];
+            for (let i = 1; i <= totalPaginas; i++) {
+                if (i === 1 || i === totalPaginas || (i >= paginaActual - 1 && i <= paginaActual + 1)) {
+                    paginas.push(i);
+                } else if (paginas[paginas.length - 1] !== '...') {
+                    paginas.push('...');
+                }
+            }
+
+            paginas.forEach(p => {
+                if (p === '...') {
+                    html += `<span class="page-ellipsis">...</span>`;
+                } else {
+                    html += `<button class="page-btn ${p === paginaActual ? 'active' : ''}" onclick="${callbackCambioPagina}(${p})">${p}</button>`;
+                }
+            });
+
+            html += `<button class="page-btn" ${paginaActual === totalPaginas ? 'disabled' : ''} onclick="${callbackCambioPagina}(${paginaActual + 1})">Siguiente »</button>`;
+            html += `</div>`;
+            contenedor.innerHTML = html;
+        }
+
+        function cambiarPaginaAdmin(nuevaPagina) {
+            paginaActualAdmin = nuevaPagina;
+            renderizarTablaAdmin();
+            document.querySelector('.table-container')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function actualizarContadores(inventario) {
+            const elemActivos = document.getElementById('contadorActivos');
+            const elemReclamados = document.getElementById('contadorReclamados');
+            const elemBajas = document.getElementById('contadorBajas');
+
+            if (elemActivos) elemActivos.innerText = inventario.filter(obj => obj.estado_actual === 'Activo').length;
+            if (elemReclamados) elemReclamados.innerText = inventario.filter(obj => obj.estado_actual === 'Reclamado').length;
+            if (elemBajas) elemBajas.innerText = inventario.filter(obj => obj.estado_actual === 'Baja').length;
+        }
+
+        async function cargarTablaAdmin() {
+            const tbody = document.getElementById('cuerpoTablaAdmin');
+            if (!tbody) return;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/objetos`);
+                if (!response.ok) throw new Error('Error al consultar la base de datos');
+                
+                objetosInventario = await response.json();
+                actualizarContadores(objetosInventario);
+                renderizarTablaAdmin();
+            } catch (error) {
+                console.error('Error:', error);
+                tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color: red; padding: 1rem;">No se pudo conectar con la API central en Vercel.</td></tr>`;
+            }
+        }
+
+        function renderizarTablaAdmin() {
+            const tbody = document.getElementById('cuerpoTablaAdmin');
+            if (!tbody) return;
+
             const terminoBusqueda = document.getElementById('buscadorCodigo') ? document.getElementById('buscadorCodigo').value.trim().toLowerCase().replace('#', '') : "";
             const filtroEstado = document.getElementById('filtroEstado') ? document.getElementById('filtroEstado').value : "Activo";
-
-            actualizarContadores(objetosInventario);
-            tbody.innerHTML = ''; 
 
             const filtrados = objetosInventario.filter(obj => {
                 const coincideCodigo = String(obj.codigo).toLowerCase().includes(terminoBusqueda);
@@ -299,12 +317,21 @@
                 return coincideCodigo && coincideEstado;
             });
 
-            if (filtrados.length === 0) {
+            const totalPaginas = Math.ceil(filtrados.length / ITEMS_POR_PAGINA_ADMIN) || 1;
+            if (paginaActualAdmin > totalPaginas) paginaActualAdmin = totalPaginas;
+
+            const inicio = (paginaActualAdmin - 1) * ITEMS_POR_PAGINA_ADMIN;
+            const paginados = filtrados.slice(inicio, inicio + ITEMS_POR_PAGINA_ADMIN);
+
+            tbody.innerHTML = '';
+
+            if (paginados.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding: 2rem; color: #6C757D;">Sin resultados para esta consulta en la base de datos.</td></tr>`;
+                generarBotonesPaginacion('paginacionAdmin', 0, 1, ITEMS_POR_PAGINA_ADMIN, 'cambiarPaginaAdmin');
                 return;
             }
 
-            filtrados.forEach(objeto => {
+            paginados.forEach(objeto => {
                 const tr = document.createElement('tr');
                 const esActivo = objeto.estado_actual === 'Activo';
                 const colorEstado = esActivo ? '#005A43' : '#721C24';
@@ -327,298 +354,278 @@
                 `;
                 tbody.appendChild(tr);
             });
-        } catch (error) {
-            console.error('Error:', error);
-            tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color: red; padding: 1rem;">No se pudo conectar con la API central en Vercel.</td></tr>`;
+
+            generarBotonesPaginacion('paginacionAdmin', filtrados.length, paginaActualAdmin, ITEMS_POR_PAGINA_ADMIN, 'cambiarPaginaAdmin');
         }
-    }
 
-    // Escuchadores de filtro y búsqueda
-    if (document.getElementById('buscadorCodigo')) {
-        document.getElementById('buscadorCodigo').addEventListener('input', cargarTablaAdmin);
-    }
-    if (document.getElementById('filtroEstado')) {
-        document.getElementById('filtroEstado').addEventListener('change', cargarTablaAdmin);
-    }
+        if (document.getElementById('buscadorCodigo')) {
+            document.getElementById('buscadorCodigo').addEventListener('input', () => {
+                paginaActualAdmin = 1;
+                renderizarTablaAdmin();
+            });
+        }
+        if (document.getElementById('filtroEstado')) {
+            document.getElementById('filtroEstado').addEventListener('change', () => {
+                paginaActualAdmin = 1;
+                renderizarTablaAdmin();
+            });
+        }
 
-    // Modal de Carga / Registro
-    const modalCarga = document.getElementById('modalCarga');
-    const modalBaja = document.getElementById('modalBaja');
+        const modalCarga = document.getElementById('modalCarga');
+        const modalBaja = document.getElementById('modalBaja');
 
-    function abrirModalCarga() {
-        const fechaInput = document.getElementById('fechaHallazgo');
-        if (fechaInput) fechaInput.valueAsDate = new Date(); 
-        if (modalCarga) modalCarga.style.display = 'flex';
-    }
+        function abrirModalCarga() {
+            const fechaInput = document.getElementById('fechaHallazgo');
+            if (fechaInput) fechaInput.valueAsDate = new Date();
+            if (modalCarga) modalCarga.style.display = 'flex';
+        }
 
-    function cerrarModalCarga() { 
-        if (modalCarga) modalCarga.style.display = 'none'; 
-        const form = document.getElementById('formSubirElemento');
-        if (form) form.reset(); 
-    }
+        function cerrarModalCarga() {
+            if (modalCarga) modalCarga.style.display = 'none';
+            const form = document.getElementById('formSubirElemento');
+            if (form) form.reset();
+        }
 
-    function convertirImagenABase64(archivo) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.readAsDataURL(archivo);
-            reader.onload = () => resolve(reader.result);
-            reader.onerror = error => reject(error);
-        });
-    }
+        function convertirImagenABase64(archivo) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(archivo);
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = error => reject(error);
+            });
+        }
 
-    async function guardarElemento(event) {
-        event.preventDefault();
+        async function guardarElemento(event) {
+            event.preventDefault();
 
-        const inputFoto = document.getElementById('fotoElemento') || document.getElementById('fotoObjeto');
-        const archivo = inputFoto && inputFoto.files ? inputFoto.files[0] : null;
+            const inputFoto = document.getElementById('fotoElemento') || document.getElementById('fotoObjeto');
+            const archivo = inputFoto && inputFoto.files ? inputFoto.files[0] : null;
+            let cadenaBase64 = null;
 
-        let cadenaBase64 = null;
+            if (archivo) {
+                try {
+                    cadenaBase64 = await convertirImagenABase64(archivo);
+                } catch (error) {
+                    console.error('Error al procesar la imagen:', error);
+                    alert('No se pudo procesar la imagen seleccionada.');
+                    return;
+                }
+            }
 
-        if (archivo) {
+            const nuevoObjeto = {
+                fecha_hallazgo: document.getElementById('fechaHallazgo').value,
+                lugar_hallazgo: document.getElementById('lugarHallazgo').value,
+                clasificacion: document.getElementById('clasificacion').value,
+                descripcion: document.getElementById('descripcion').value,
+                ruta_foto: cadenaBase64
+            };
+
             try {
-                cadenaBase64 = await convertirImagenABase64(archivo);
+                const response = await fetch(`${API_BASE_URL}/api/objetos`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(nuevoObjeto)
+                });
+
+                if (!response.ok) throw new Error('Error al registrar el objeto en el servidor');
+
+                const resultado = await response.json();
+                alert(`Objeto #${resultado.data.codigo} registrado exitosamente en la nube.`);
+                
+                cerrarModalCarga();
+                cargarTablaAdmin();
             } catch (error) {
-                console.error('Error al procesar la imagen:', error);
-                alert('No se pudo procesar la imagen seleccionada.');
-                return;
+                alert(`Error: ${error.message}`);
             }
         }
 
-        const nuevoObjeto = {
-            fecha_hallazgo: document.getElementById('fechaHallazgo').value,
-            lugar_hallazgo: document.getElementById('lugarHallazgo').value,
-            clasificacion: document.getElementById('clasificacion').value,
-            descripcion: document.getElementById('descripcion').value,
-            ruta_foto: cadenaBase64
-        };
+        function abrirBaja(codigo) {
+            const form = document.getElementById('formBaja');
+            if (form) form.reset();
 
-        try {
-            const response = await fetch(`${API_BASE_URL}/api/objetos`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(nuevoObjeto)
-            });
+            const elemVis = document.getElementById('bajaCodigoVisible');
+            const elemVal = document.getElementById('bajaCodigoElemento');
+            if (elemVis) elemVis.innerText = "#" + codigo;
+            if (elemVal) elemVal.value = codigo;
 
-            if (!response.ok) throw new Error('Error al registrar el objeto en el servidor');
+            const ahora = new Date();
+            const fechaSalida = document.getElementById('bajaFecha');
+            const horaSalida = document.getElementById('bajaHora');
 
-            const resultado = await response.json();
-            alert(`Objeto #${resultado.data.codigo} registrado exitosamente en la nube.`);
+            if (fechaSalida) fechaSalida.valueAsDate = ahora;
+            if (horaSalida) horaSalida.value = `${String(ahora.getHours()).padStart(2, '0')}:${String(ahora.getMinutes()).padStart(2, '0')}`;
             
-            cerrarModalCarga(); 
-            cargarTablaAdmin();
-        } catch (error) {
-            alert(`Error: ${error.message}`);
-        }
-    }
+            const inputFuncionario = document.getElementById('bajaFuncionario');
+            if (inputFuncionario) inputFuncionario.value = '';
 
-    // Modal de Baja / Salida
-    function abrirBaja(codigo) {
-        const form = document.getElementById('formBaja');
-        if (form) form.reset();
-
-        const elemVis = document.getElementById('bajaCodigoVisible');
-        const elemVal = document.getElementById('bajaCodigoElemento');
-        if (elemVis) elemVis.innerText = "#" + codigo;
-        if (elemVal) elemVal.value = codigo;
-
-        const ahora = new Date();
-        const fechaSalida = document.getElementById('bajaFecha');
-        const horaSalida = document.getElementById('bajaHora');
-
-        if (fechaSalida) fechaSalida.valueAsDate = ahora;
-        if (horaSalida) horaSalida.value = `${String(ahora.getHours()).padStart(2, '0')}:${String(ahora.getMinutes()).padStart(2, '0')}`;
-        
-        // Limpiar explícitamente el campo del funcionario en turno
-        const inputFuncionario = document.getElementById('bajaFuncionario');
-        if (inputFuncionario) inputFuncionario.value = '';
-
-        if (modalBaja) modalBaja.style.display = 'flex';
-    }
-
-    function cerrarModalBaja() { 
-        if (modalBaja) modalBaja.style.display = 'none'; 
-        const form = document.getElementById('formBaja');
-        if (form) form.reset(); 
-    }
-
-    // Procesar Salida en Supabase enviando la firma del funcionario
-    async function guardarBaja(event) {
-        event.preventDefault();
-
-        const funcionarioTurno = document.getElementById('bajaFuncionario').value.trim();
-        if (!funcionarioTurno) {
-            alert("Por favor ingrese el nombre del funcionario responsable del turno.");
-            return;
+            if (modalBaja) modalBaja.style.display = 'flex';
         }
 
-        const datosBaja = {
-            codigo_objeto: parseInt(document.getElementById('bajaCodigoElemento').value),
-            tipo_salida: document.getElementById('bajaEstado').value,
-            fecha_salida: document.getElementById('bajaFecha').value,
-            hora_salida: document.getElementById('bajaHora').value,
-            categoria_retira: document.getElementById('bajaCategoria').value,
-            nombre_retira: document.getElementById('bajaNombre').value,
-            id_funcionario: usuarioActivo.id_usuario,
-            funcionario_turno: funcionarioTurno
-        };
-
-        try {
-            const response = await fetch(`${API_BASE_URL}/api/objetos/baja`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(datosBaja)
-            });
-
-            if (!response.ok) throw new Error('Error al procesar la salida en el servidor');
-
-            const resultado = await response.json();
-            alert(resultado.mensaje);
-            cerrarModalBaja(); 
-            cargarTablaAdmin();
-        } catch (error) {
-            alert(`Error: ${error.message}`);
-        }
-    }
-
-    // EXPORTACIÓN DE DATOS A EXCEL COMPLETA (SheetJS)
-    function descargarReporteExcel() {
-        if (objetosInventario.length === 0) return alert("No hay datos cargados para exportar.");
-        
-        const datos = objetosInventario.map(obj => ({
-            "Código": `#${obj.codigo}`, 
-            "Fecha Hallazgo": obj.fecha_hallazgo, 
-            "Lugar del Hallazgo": obj.lugar_hallazgo, 
-            "Clasificación": obj.clasificacion,
-            "Descripción": obj.descripcion, 
-            "Estado Actual": obj.estado_actual,
-            "Categoría de quien retira": obj.categoria_retira || (obj.estado_actual === 'Activo' ? 'N/A (En Custodia)' : 'Sin Registro'),
-            "Entregado / Retirado por": obj.nombre_retira || (obj.estado_actual === 'Activo' ? 'N/A (En Custodia)' : 'Sin Registro'),
-            "Fecha / Hora Salida": obj.fecha_salida ? `${obj.fecha_salida} ${obj.hora_salida || ''}` : (obj.estado_actual === 'Activo' ? 'N/A (En Custodia)' : 'Sin Registro'),
-            "Funcionario que procesa la salida": obj.funcionario_procesa || (obj.estado_actual === 'Activo' ? 'N/A (En Custodia)' : 'Sin Registro')
-        }));
-        
-        const ws = XLSX.utils.json_to_sheet(datos);
-        ws['!cols'] = [
-            {wch: 12}, // Código
-            {wch: 15}, // Fecha Hallazgo
-            {wch: 25}, // Lugar del Hallazgo
-            {wch: 15}, // Clasificación
-            {wch: 35}, // Descripción
-            {wch: 15}, // Estado Actual
-            {wch: 25}, // Categoría de quien retira
-            {wch: 30}, // Entregado / Retirado por
-            {wch: 22}, // Fecha / Hora Salida
-            {wch: 35}  // Funcionario que procesa la salida
-        ];
-        
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Inventario_ECO-S");
-        XLSX.writeFile(wb, `ECO-S_Reporte_Inventario_${new Date().toISOString().split('T')[0]}.xlsx`);
-    }
-
-    // ==========================================
-    // 3. Módulo: Gestión de Usuarios
-    // ==========================================
-    const modalUsuario = document.getElementById('modalUsuario');
-
-    function abrirModalUsuario() { 
-        if (modalUsuario) modalUsuario.style.display = 'flex'; 
-    }
-    
-    function cerrarModalUsuario() { 
-        if (modalUsuario) modalUsuario.style.display = 'none'; 
-        const form = document.getElementById('formCrearUsuario');
-        if (form) form.reset();
-    }
-
-    // Registrar nuevo usuario en Supabase a través de Vercel
-    async function guardarUsuario(event) {
-        event.preventDefault();
-
-        const correo = document.getElementById('nuevoCorreo').value.trim();
-        const contrasena = document.getElementById('nuevaContrasena').value.trim();
-        const rol = document.getElementById('nuevoRol').value;
-
-        if (!correo || !contrasena || !rol) {
-            alert("Por favor complete todos los campos obligatorios.");
-            return;
+        function cerrarModalBaja() {
+            if (modalBaja) modalBaja.style.display = 'none';
+            const form = document.getElementById('formBaja');
+            if (form) form.reset();
         }
 
-        const payload = {
-            correo: correo,
-            contrasena: contrasena,
-            rol: rol
-        };
+        async function guardarBaja(event) {
+            event.preventDefault();
 
-        try {
-            const response = await fetch(`${API_BASE_URL}/api/usuarios`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.detail || 'Error al registrar el usuario en el servidor');
-            }
-
-            const resultado = await response.json();
-            alert(`Usuario ${correo} creado exitosamente con el rol ${rol}.`);
-
-            cerrarModalUsuario();
-            cargarTablaUsuarios(); // Actualizar la tabla en tiempo real
-        } catch (error) {
-            console.error("Error al registrar usuario:", error);
-            alert(`Error: ${error.message}`);
-        }
-    }
-
-    // Cargar la lista completa de usuarios desde la API
-    async function cargarTablaUsuarios() {
-        const tbody = document.getElementById('cuerpoTablaUsuarios');
-        if (!tbody) return;
-
-        try {
-            const response = await fetch(`${API_BASE_URL}/api/usuarios`);
-            if (!response.ok) throw new Error('Error al consultar usuarios en la base de datos');
-
-            const usuarios = await response.json();
-            tbody.innerHTML = '';
-
-            if (!usuarios || usuarios.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding: 1.5rem; color: #6C757D;">No hay usuarios registrados en la base de datos.</td></tr>`;
+            const funcionarioTurno = document.getElementById('bajaFuncionario').value.trim();
+            if (!funcionarioTurno) {
+                alert("Por favor ingrese el nombre del funcionario responsable del turno.");
                 return;
             }
 
-            usuarios.forEach(user => {
-                const tr = document.createElement('tr');
-                const esSesionActual = user.id_usuario === usuarioActivo?.id_usuario || user.correo === usuarioActivo?.correo;
+            const datosBaja = {
+                codigo_objeto: parseInt(document.getElementById('bajaCodigoElemento').value),
+                tipo_salida: document.getElementById('bajaEstado').value,
+                fecha_salida: document.getElementById('bajaFecha').value,
+                hora_salida: document.getElementById('bajaHora').value,
+                categoria_retira: document.getElementById('bajaCategoria').value,
+                nombre_retira: document.getElementById('bajaNombre').value,
+                id_funcionario: usuarioActivo.id_usuario,
+                funcionario_turno: funcionarioTurno,
+                funcionario_entrega: funcionarioTurno
+            };
 
-                tr.innerHTML = `
-                    <td>${user.id_usuario || '--'}</td>
-                    <td><strong>${user.correo}</strong></td>
-                    <td><span class="tag-category">${user.rol}</span></td>
-                    <td>
-                        ${esSesionActual ? 
-                            '<span class="text-muted" style="font-size: 0.85rem;">Sesión Actual (Protegido)</span>' : 
-                            '<span class="text-muted" style="font-size: 0.85rem;">Activo</span>'
-                        }
-                    </td>
-                `;
-                tbody.appendChild(tr);
-            });
-        } catch (error) {
-            console.error('Error al cargar la tabla de usuarios:', error);
-            tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color: red; padding: 1rem;">Error de conexión al cargar usuarios desde el servidor.</td></tr>`;
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/objetos/baja`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(datosBaja)
+                });
+
+                if (!response.ok) throw new Error('Error al procesar la salida en el servidor');
+
+                const resultado = await response.json();
+                alert(resultado.mensaje);
+                cerrarModalBaja();
+                cargarTablaAdmin();
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            }
         }
-    }
 
-    // ==========================================
-    // 4. Inicialización
-    // ==========================================
-    window.onload = function() {
-        cargarTablaAdmin();
-    };
-</script>
+        function descargarReporteExcel() {
+            if (objetosInventario.length === 0) return alert("No hay datos cargados para exportar.");
+            
+            const datos = objetosInventario.map(obj => ({
+                "Código": `#${obj.codigo}`, 
+                "Fecha Hallazgo": obj.fecha_hallazgo, 
+                "Lugar del Hallazgo": obj.lugar_hallazgo, 
+                "Clasificación": obj.clasificacion,
+                "Descripción": obj.descripcion, 
+                "Estado Actual": obj.estado_actual,
+                "Categoría de quien retira": obj.categoria_retira || (obj.estado_actual === 'Activo' ? 'N/A (En Custodia)' : 'Sin Registro'),
+                "Entregado / Retirado por": obj.nombre_retira || (obj.estado_actual === 'Activo' ? 'N/A (En Custodia)' : 'Sin Registro'),
+                "Fecha / Hora Salida": obj.fecha_salida ? `${obj.fecha_salida} ${obj.hora_salida || ''}` : (obj.estado_actual === 'Activo' ? 'N/A (En Custodia)' : 'Sin Registro'),
+                "Funcionario que procesa la salida": obj.funcionario_procesa || (obj.estado_actual === 'Activo' ? 'N/A (En Custodia)' : 'Sin Registro')
+            }));
+            
+            const ws = XLSX.utils.json_to_sheet(datos);
+            ws['!cols'] = [
+                {wch: 12}, {wch: 15}, {wch: 25}, {wch: 15}, {wch: 35},
+                {wch: 15}, {wch: 25}, {wch: 30}, {wch: 22}, {wch: 35}
+            ];
+            
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Inventario_ECO-S");
+            XLSX.writeFile(wb, `ECO-S_Reporte_Inventario_${new Date().toISOString().split('T')[0]}.xlsx`);
+        }
+
+        const modalUsuario = document.getElementById('modalUsuario');
+
+        function abrirModalUsuario() {
+            if (modalUsuario) modalUsuario.style.display = 'flex';
+        }
+        
+        function cerrarModalUsuario() {
+            if (modalUsuario) modalUsuario.style.display = 'none';
+            const form = document.getElementById('formCrearUsuario');
+            if (form) form.reset();
+        }
+
+        async function guardarUsuario(event) {
+            event.preventDefault();
+
+            const correo = document.getElementById('nuevoCorreo').value.trim();
+            const contrasena = document.getElementById('nuevaContrasena').value.trim();
+            const rol = document.getElementById('nuevoRol').value;
+
+            if (!correo || !contrasena || !rol) {
+                alert("Por favor complete todos los campos obligatorios.");
+                return;
+            }
+
+            const payload = {
+                correo: correo,
+                contrasena: contrasena,
+                rol: rol
+            };
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/usuarios`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || 'Error al registrar el usuario en el servidor');
+                }
+
+                alert(`Usuario ${correo} creado exitosamente con el rol ${rol}.`);
+                cerrarModalUsuario();
+                cargarTablaUsuarios();
+            } catch (error) {
+                console.error("Error al registrar usuario:", error);
+                alert(`Error: ${error.message}`);
+            }
+        }
+
+        async function cargarTablaUsuarios() {
+            const tbody = document.getElementById('cuerpoTablaUsuarios');
+            if (!tbody) return;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/usuarios`);
+                if (!response.ok) throw new Error('Error al consultar usuarios en la base de datos');
+
+                const usuarios = await response.json();
+                tbody.innerHTML = '';
+
+                if (!usuarios || usuarios.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding: 1.5rem; color: #6C757D;">No hay usuarios registrados en la base de datos.</td></tr>`;
+                    return;
+                }
+
+                usuarios.forEach(user => {
+                    const tr = document.createElement('tr');
+                    const esSesionActual = user.id_usuario === usuarioActivo?.id_usuario || user.correo === usuarioActivo?.correo;
+
+                    tr.innerHTML = `
+                        <td>${user.id_usuario || '--'}</td>
+                        <td><strong>${user.correo}</strong></td>
+                        <td><span class="tag-category">${user.rol}</span></td>
+                        <td>
+                            ${esSesionActual ? 
+                                '<span class="text-muted" style="font-size: 0.85rem;">Sesión Actual (Protegido)</span>' : 
+                                '<span class="text-muted" style="font-size: 0.85rem;">Activo</span>'
+                            }
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch (error) {
+                console.error('Error al cargar la tabla de usuarios:', error);
+                tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color: red; padding: 1rem;">Error de conexión al cargar usuarios desde el servidor.</td></tr>`;
+            }
+        }
+
+        window.onload = function() {
+            cargarTablaAdmin();
+        };
+    </script>
 </body>
 </html>
