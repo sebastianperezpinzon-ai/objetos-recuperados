@@ -564,3 +564,70 @@ body {
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35);
     border-radius: 6px;
 }
+
+
+
+
+/* ==========================================
+   Paginación Inteligente ECO-S
+   ========================================== */
+.pagination-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    margin: 2rem 0 1rem;
+    padding: 1rem;
+}
+
+.pagination-info {
+    font-size: 0.85rem;
+    color: #6C757D;
+}
+
+.pagination-controls {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.page-btn {
+    min-width: 38px;
+    height: 38px;
+    padding: 0 0.75rem;
+    border: 1px solid #DCE1E5;
+    background-color: #FFFFFF;
+    color: #212529;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.page-btn:hover:not(:disabled):not(.active) {
+    background-color: #E8F5E9;
+    border-color: var(--primary-color, #005A43);
+    color: var(--primary-color, #005A43);
+}
+
+.page-btn.active {
+    background-color: var(--primary-color, #005A43);
+    border-color: var(--primary-color, #005A43);
+    color: #FFFFFF;
+    font-weight: 700;
+}
+
+.page-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.page-ellipsis {
+    padding: 0 0.4rem;
+    color: #6C757D;
+    font-weight: 600;
+    user-select: none;
+}
