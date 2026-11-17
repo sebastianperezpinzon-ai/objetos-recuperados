@@ -9,8 +9,6 @@
 <body>
 
     <div class="dashboard-wrapper">
-        
-        <!-- Menú Lateral Registro -->
         <nav class="sidebar">
             <h2>Registro ECO-S</h2>
             <a href="#" class="nav-link active">Inventario Activo</a>
@@ -18,7 +16,6 @@
         </nav>
 
         <main class="main-content">
-            
             <div class="header-actions">
                 <h1>Atención en Central: Objetos</h1>
                 <div>
@@ -26,7 +23,6 @@
                 </div>
             </div>
 
-            <!-- Panel de Indicadores y Filtros -->
             <div class="stats-grid">
                 <div class="stat-card">
                     <h3 id="contadorActivos">--</h3>
@@ -57,10 +53,10 @@
                 </table>
             </div>
 
+            <div id="paginacionRegistro" class="pagination-wrapper"></div>
         </main>
     </div>
 
-    <!-- Modal para Subir Elemento -->
     <div id="modalCarga" class="modal-overlay">
         <div class="modal-content">
             <div class="modal-header">
@@ -98,11 +94,9 @@
                     <input type="text" id="descripcion" class="form-control" required placeholder="Color, marca, detalles particulares">
                 </div>
 
-                <!-- MÓDULO MEJORADO DE CAPTURA Y CARGA DE FOTOGRAFÍA -->
                 <div class="foto-uploader-container">
                     <label class="form-label" style="font-weight: 600; margin-bottom: 0.5rem; display: block;">Fotografía del Objeto Recuperado:</label>
                     
-                    <!-- Botones de Acción Directa -->
                     <div class="opciones-foto-buttons">
                         <button type="button" class="btn-foto" onclick="document.getElementById('inputCamara').click();">
                             📸 Tomar Foto
@@ -112,11 +106,9 @@
                         </button>
                     </div>
 
-                    <!-- Inputs ocultos para cámara y galería -->
                     <input type="file" id="inputCamara" accept="image/*" capture="environment" style="display: none;" onchange="procesarFotoSeleccionada(this)">
                     <input type="file" id="inputGaleria" accept="image/*" style="display: none;" onchange="procesarFotoSeleccionada(this)">
 
-                    <!-- Vista previa de la imagen seleccionada/tomada -->
                     <div id="previewContainer" class="preview-container" style="display: none;">
                         <img id="imgPreview" src="" alt="Vista previa del objeto" class="img-preview">
                         <button type="button" class="btn-eliminar-foto" onclick="limpiarFoto()">✕ Quitar foto</button>
@@ -128,7 +120,6 @@
         </div>
     </div>
 
-    <!-- Modal: Dar de Baja / Procesar Salida -->
     <div id="modalBaja" class="modal-overlay">
         <div class="modal-content">
             <div class="modal-header">
@@ -167,7 +158,6 @@
                     <input type="text" id="bajaNombre" class="form-control" required placeholder="Ej: Juan Pérez" autocomplete="off">
                 </div>
 
-                <!-- Campo de trazabilidad manual desvinculado de autocompletado del navegador -->
                 <div class="form-group" style="border-top: 1px dashed #ccc; padding-top: 1rem; margin-top: 1rem;">
                     <label style="color: var(--primary-color, #005A43); font-weight: bold;">Funcionario que procesa la salida (Responsable en turno) *</label>
                     <input type="text" id="bajaFuncionario" class="form-control" required placeholder="Nombre del colaborador en turno" autocomplete="new-password">
@@ -179,150 +169,203 @@
     </div>
 
     <script>
-    // URL base para entorno Serverless en Vercel (Ruta relativa)
-    const API_BASE_URL = '';
+        const API_BASE_URL = '';
+        const ITEMS_POR_PAGINA_REGISTRO = 15;
 
-    // Validar sesión activa del usuario de Registro
-    const usuarioActivo = JSON.parse(localStorage.getItem('ecos_usuario_activo'));
-    if (!usuarioActivo) {
-        window.location.href = '../login.html';
-    }
-
-    let objetosInventario = [];
-    let archivoFotoSeleccionado = null; // Variable global para almacenar la foto capturada o elegida
-
-    // Procesar selección de foto (Cámara o Galería)
-    function procesarFotoSeleccionada(input) {
-        if (input.files && input.files[0]) {
-            const archivo = input.files[0];
-
-            if (!archivo.type.startsWith('image/')) {
-                alert('Por favor selecciona un archivo de imagen válido.');
-                return;
-            }
-
-            archivoFotoSeleccionado = archivo;
-
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                document.getElementById('imgPreview').src = e.target.result;
-                document.getElementById('previewContainer').style.display = 'block';
-            };
-            reader.readAsDataURL(archivo);
+        const usuarioActivo = JSON.parse(localStorage.getItem('ecos_usuario_activo'));
+        if (!usuarioActivo) {
+            window.location.href = '../login.html';
         }
-    }
 
-    // Limpiar selección de foto y ocultar previsualización
-    function limpiarFoto() {
-        archivoFotoSeleccionado = null;
-        const inputCamara = document.getElementById('inputCamara');
-        const inputGaleria = document.getElementById('inputGaleria');
-        const imgPreview = document.getElementById('imgPreview');
-        const previewContainer = document.getElementById('previewContainer');
+        let objetosInventario = [];
+        let archivoFotoSeleccionado = null;
+        let paginaActualRegistro = 1;
 
-        if (inputCamara) inputCamara.value = '';
-        if (inputGaleria) inputGaleria.value = '';
-        if (imgPreview) imgPreview.src = '';
-        if (previewContainer) previewContainer.style.display = 'none';
-    }
+        function procesarFotoSeleccionada(input) {
+            if (input.files && input.files[0]) {
+                const archivo = input.files[0];
 
-    // Convierte y comprime la imagen a máximo 600px de ancho/alto con calidad optimizada
-    function convertirImagenABase64(archivo) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.readAsDataURL(archivo);
-            reader.onload = (event) => {
-                const img = new Image();
-                img.src = event.target.result;
-                img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    const MAX_WIDTH = 600;
-                    const MAX_HEIGHT = 600;
-                    let width = img.width;
-                    let height = img.height;
+                if (!archivo.type.startsWith('image/')) {
+                    alert('Por favor selecciona un archivo de imagen válido.');
+                    return;
+                }
 
-                    if (width > height) {
-                        if (width > MAX_WIDTH) {
-                            height *= MAX_WIDTH / width;
-                            width = MAX_WIDTH;
-                        }
-                    } else {
-                        if (height > MAX_HEIGHT) {
-                            width *= MAX_HEIGHT / height;
-                            height = MAX_HEIGHT;
-                        }
-                    }
+                archivoFotoSeleccionado = archivo;
 
-                    canvas.width = width;
-                    canvas.height = height;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, width, height);
-
-                    const base64Comprimido = canvas.toDataURL('image/jpeg', 0.5);
-                    resolve(base64Comprimido);
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('imgPreview').src = e.target.result;
+                    document.getElementById('previewContainer').style.display = 'block';
                 };
-                img.onerror = (error) => reject(error);
-            };
-            reader.onerror = (error) => reject(error);
-        });
-    }
-
-    // Registrar objeto desde el panel de Registro
-    async function guardarElemento(event) {
-        event.preventDefault();
-
-        let cadenaBase64 = null;
-
-        if (archivoFotoSeleccionado) {
-            try {
-                cadenaBase64 = await convertirImagenABase64(archivoFotoSeleccionado);
-            } catch (error) {
-                alert('Error al procesar la imagen seleccionada.');
-                return;
+                reader.readAsDataURL(archivo);
             }
         }
 
-        const nuevoObjeto = {
-            fecha_hallazgo: document.getElementById('fechaHallazgo').value,
-            lugar_hallazgo: document.getElementById('lugarHallazgo').value,
-            clasificacion: document.getElementById('clasificacion').value,
-            descripcion: document.getElementById('descripcion').value,
-            ruta_foto: cadenaBase64
-        };
+        function limpiarFoto() {
+            archivoFotoSeleccionado = null;
+            const inputCamara = document.getElementById('inputCamara');
+            const inputGaleria = document.getElementById('inputGaleria');
+            const imgPreview = document.getElementById('imgPreview');
+            const previewContainer = document.getElementById('previewContainer');
 
-        try {
-            const response = await fetch(`${API_BASE_URL}/api/objetos`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(nuevoObjeto)
+            if (inputCamara) inputCamara.value = '';
+            if (inputGaleria) inputGaleria.value = '';
+            if (imgPreview) imgPreview.src = '';
+            if (previewContainer) previewContainer.style.display = 'none';
+        }
+
+        function convertirImagenABase64(archivo) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(archivo);
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.src = event.target.result;
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        const MAX_WIDTH = 600;
+                        const MAX_HEIGHT = 600;
+                        let width = img.width;
+                        let height = img.height;
+
+                        if (width > height) {
+                            if (width > MAX_WIDTH) {
+                                height *= MAX_WIDTH / width;
+                                width = MAX_WIDTH;
+                            }
+                        } else {
+                            if (height > MAX_HEIGHT) {
+                                width *= MAX_HEIGHT / height;
+                                height = MAX_HEIGHT;
+                            }
+                        }
+
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+
+                        const base64Comprimido = canvas.toDataURL('image/jpeg', 0.5);
+                        resolve(base64Comprimido);
+                    };
+                    img.onerror = (error) => reject(error);
+                };
+                reader.onerror = (error) => reject(error);
+            });
+        }
+
+        async function guardarElemento(event) {
+            event.preventDefault();
+
+            let cadenaBase64 = null;
+
+            if (archivoFotoSeleccionado) {
+                try {
+                    cadenaBase64 = await convertirImagenABase64(archivoFotoSeleccionado);
+                } catch (error) {
+                    alert('Error al procesar la imagen seleccionada.');
+                    return;
+                }
+            }
+
+            const nuevoObjeto = {
+                fecha_hallazgo: document.getElementById('fechaHallazgo').value,
+                lugar_hallazgo: document.getElementById('lugarHallazgo').value,
+                clasificacion: document.getElementById('clasificacion').value,
+                descripcion: document.getElementById('descripcion').value,
+                ruta_foto: cadenaBase64
+            };
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/objetos`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(nuevoObjeto)
+                });
+
+                if (!response.ok) throw new Error('Error al registrar el objeto');
+
+                const resultado = await response.json();
+                alert(`Objeto #${resultado.data.codigo} registrado exitosamente en el sistema.`);
+                
+                cerrarModalCarga();
+                cargarTablaRegistro();
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            }
+        }
+
+        function generarBotonesPaginacion(contenedorId, totalItems, paginaActual, itemsPorPagina, callbackCambioPagina) {
+            const contenedor = document.getElementById(contenedorId);
+            if (!contenedor) return;
+
+            const totalPaginas = Math.ceil(totalItems / itemsPorPagina);
+            if (totalPaginas <= 1) {
+                contenedor.innerHTML = totalItems > 0 
+                    ? `<span class="pagination-info">Mostrando ${totalItems} registro(s)</span>` 
+                    : '';
+                return;
+            }
+
+            const inicio = (paginaActual - 1) * itemsPorPagina + 1;
+            const fin = Math.min(paginaActual * itemsPorPagina, totalItems);
+
+            let html = `<span class="pagination-info">Mostrando <strong>${inicio}–${fin}</strong> de <strong>${totalItems}</strong> objetos activos</span>`;
+            html += `<div class="pagination-controls">`;
+            html += `<button class="page-btn" ${paginaActual === 1 ? 'disabled' : ''} onclick="${callbackCambioPagina}(${paginaActual - 1})">« Anterior</button>`;
+
+            const paginas = [];
+            for (let i = 1; i <= totalPaginas; i++) {
+                if (i === 1 || i === totalPaginas || (i >= paginaActual - 1 && i <= paginaActual + 1)) {
+                    paginas.push(i);
+                } else if (paginas[paginas.length - 1] !== '...') {
+                    paginas.push('...');
+                }
+            }
+
+            paginas.forEach(p => {
+                if (p === '...') {
+                    html += `<span class="page-ellipsis">...</span>`;
+                } else {
+                    html += `<button class="page-btn ${p === paginaActual ? 'active' : ''}" onclick="${callbackCambioPagina}(${p})">${p}</button>`;
+                }
             });
 
-            if (!response.ok) throw new Error('Error al registrar el objeto');
-
-            const resultado = await response.json();
-            alert(`Objeto #${resultado.data.codigo} registrado exitosamente en Supabase.`);
-            
-            cerrarModalCarga();
-            cargarTablaRegistro();
-        } catch (error) {
-            alert(`Error: ${error.message}`);
+            html += `<button class="page-btn" ${paginaActual === totalPaginas ? 'disabled' : ''} onclick="${callbackCambioPagina}(${paginaActual + 1})">Siguiente »</button>`;
+            html += `</div>`;
+            contenedor.innerHTML = html;
         }
-    }
 
-    // Consultar tabla de registro
-    async function cargarTablaRegistro() {
-        const tbody = document.getElementById('cuerpoTablaAdmin') || document.getElementById('cuerpoTablaRegistro');
-        if (!tbody) return;
+        function cambiarPaginaRegistro(nuevaPagina) {
+            paginaActualRegistro = nuevaPagina;
+            renderizarTablaRegistro();
+            document.querySelector('.table-container')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
 
-        try {
-            const response = await fetch(`${API_BASE_URL}/api/objetos`);
-            if (!response.ok) throw new Error('Error de conexión');
+        async function cargarTablaRegistro() {
+            const tbody = document.getElementById('cuerpoTablaAdmin') || document.getElementById('cuerpoTablaRegistro');
+            if (!tbody) return;
 
-            objetosInventario = await response.json();
-            
-            const activosCount = objetosInventario.filter(obj => obj.estado_actual === 'Activo').length;
-            const elemContador = document.getElementById('contadorActivos');
-            if (elemContador) elemContador.innerText = activosCount;
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/objetos`);
+                if (!response.ok) throw new Error('Error de conexión');
+
+                objetosInventario = await response.json();
+                
+                const activosCount = objetosInventario.filter(obj => obj.estado_actual === 'Activo').length;
+                const elemContador = document.getElementById('contadorActivos');
+                if (elemContador) elemContador.innerText = activosCount;
+
+                renderizarTablaRegistro();
+            } catch (error) {
+                console.error('Error al cargar inventario:', error);
+                tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color: red; padding: 1rem;">Error de conexión con el servidor backend.</td></tr>`;
+            }
+        }
+
+        function renderizarTablaRegistro() {
+            const tbody = document.getElementById('cuerpoTablaAdmin') || document.getElementById('cuerpoTablaRegistro');
+            if (!tbody) return;
 
             const terminoBusqueda = document.getElementById('buscadorCodigo') ? document.getElementById('buscadorCodigo').value.trim().toLowerCase().replace('#', '') : "";
             
@@ -331,14 +374,21 @@
                 return coincideCodigo && obj.estado_actual === 'Activo';
             });
 
+            const totalPaginas = Math.ceil(filtrados.length / ITEMS_POR_PAGINA_REGISTRO) || 1;
+            if (paginaActualRegistro > totalPaginas) paginaActualRegistro = totalPaginas;
+
+            const inicio = (paginaActualRegistro - 1) * ITEMS_POR_PAGINA_REGISTRO;
+            const paginados = filtrados.slice(inicio, inicio + ITEMS_POR_PAGINA_REGISTRO);
+
             tbody.innerHTML = '';
 
-            if (filtrados.length === 0) {
+            if (paginados.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding: 2rem; color: #6C757D;">No hay objetos activos que coincidan con la consulta.</td></tr>`;
+                generarBotonesPaginacion('paginacionRegistro', 0, 1, ITEMS_POR_PAGINA_REGISTRO, 'cambiarPaginaRegistro');
                 return;
             }
 
-            filtrados.forEach(obj => {
+            paginados.forEach(obj => {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td><strong>#${obj.codigo}</strong></td>
@@ -358,109 +408,109 @@
                 `;
                 tbody.appendChild(tr);
             });
-        } catch (error) {
-            console.error('Error al cargar inventario:', error);
-            tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color: red; padding: 1rem;">Error de conexión con el servidor backend.</td></tr>`;
-        }
-    }
 
-    const inputBuscador = document.getElementById('buscadorCodigo');
-    if (inputBuscador) {
-        inputBuscador.addEventListener('input', cargarTablaRegistro);
-    }
-
-    function abrirModalCarga() {
-        limpiarFoto();
-        const modal = document.getElementById('modalCarga');
-        if (modal) modal.style.display = 'flex';
-        const fechaInput = document.getElementById('fechaHallazgo');
-        if (fechaInput) fechaInput.valueAsDate = new Date();
-    }
-
-    function cerrarModalCarga() {
-        const modal = document.getElementById('modalCarga');
-        if (modal) modal.style.display = 'none';
-        const form = document.getElementById('formSubirElemento');
-        if (form) form.reset();
-        limpiarFoto();
-    }
-
-    function abrirBaja(codigo) {
-        const form = document.getElementById('formBaja');
-        if (form) form.reset();
-
-        const elemVis = document.getElementById('bajaCodigoVisible');
-        const elemVal = document.getElementById('bajaCodigoElemento');
-        if (elemVis) elemVis.innerText = "#" + codigo;
-        if (elemVal) elemVal.value = codigo;
-
-        const ahora = new Date();
-        const fechaInput = document.getElementById('bajaFecha');
-        const horaInput = document.getElementById('bajaHora');
-
-        if (fechaInput) fechaInput.valueAsDate = ahora;
-        if (horaInput) horaInput.value = `${String(ahora.getHours()).padStart(2, '0')}:${String(ahora.getMinutes()).padStart(2, '0')}`;
-
-        const inputFuncionario = document.getElementById('bajaFuncionario');
-        if (inputFuncionario) {
-            inputFuncionario.value = '';
+            generarBotonesPaginacion('paginacionRegistro', filtrados.length, paginaActualRegistro, ITEMS_POR_PAGINA_REGISTRO, 'cambiarPaginaRegistro');
         }
 
-        const modal = document.getElementById('modalBaja');
-        if (modal) modal.style.display = 'flex';
-    }
-
-    function cerrarModalBaja() {
-        const modal = document.getElementById('modalBaja');
-        if (modal) modal.style.display = 'none';
-        const form = document.getElementById('formBaja');
-        if (form) form.reset();
-    }
-
-    // Procesar salida verificando firma manual y guardando trazabilidad en Supabase
-    async function guardarBaja(event) {
-        event.preventDefault();
-
-        const funcionarioTurno = document.getElementById('bajaFuncionario').value.trim();
-        if (!funcionarioTurno) {
-            alert("Por favor ingrese el nombre del funcionario responsable del turno.");
-            return;
-        }
-
-        const datosBaja = {
-            codigo_objeto: parseInt(document.getElementById('bajaCodigoElemento').value),
-            tipo_salida: document.getElementById('bajaEstado').value,
-            fecha_salida: document.getElementById('bajaFecha').value,
-            hora_salida: document.getElementById('bajaHora').value,
-            categoria_retira: document.getElementById('bajaCategoria').value,
-            nombre_retira: document.getElementById('bajaNombre').value,
-            funcionario_turno: funcionarioTurno,
-            funcionario_entrega: funcionarioTurno,
-            id_funcionario: usuarioActivo.id_usuario
-        };
-
-        try {
-            const response = await fetch(`${API_BASE_URL}/api/objetos/baja`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(datosBaja)
+        const inputBuscador = document.getElementById('buscadorCodigo');
+        if (inputBuscador) {
+            inputBuscador.addEventListener('input', () => {
+                paginaActualRegistro = 1;
+                renderizarTablaRegistro();
             });
-
-            if (!response.ok) throw new Error('Error al registrar la salida en el servidor');
-
-            const resultado = await response.json();
-            alert(resultado.mensaje);
-
-            cerrarModalBaja();
-            cargarTablaRegistro();
-        } catch (error) {
-            alert(`Error: ${error.message}`);
         }
-    }
 
-    window.onload = function() {
-        cargarTablaRegistro();
-    };
+        function abrirModalCarga() {
+            limpiarFoto();
+            const modal = document.getElementById('modalCarga');
+            if (modal) modal.style.display = 'flex';
+            const fechaInput = document.getElementById('fechaHallazgo');
+            if (fechaInput) fechaInput.valueAsDate = new Date();
+        }
+
+        function cerrarModalCarga() {
+            const modal = document.getElementById('modalCarga');
+            if (modal) modal.style.display = 'none';
+            const form = document.getElementById('formSubirElemento');
+            if (form) form.reset();
+            limpiarFoto();
+        }
+
+        function abrirBaja(codigo) {
+            const form = document.getElementById('formBaja');
+            if (form) form.reset();
+
+            const elemVis = document.getElementById('bajaCodigoVisible');
+            const elemVal = document.getElementById('bajaCodigoElemento');
+            if (elemVis) elemVis.innerText = "#" + codigo;
+            if (elemVal) elemVal.value = codigo;
+
+            const ahora = new Date();
+            const fechaInput = document.getElementById('bajaFecha');
+            const horaInput = document.getElementById('bajaHora');
+
+            if (fechaInput) fechaInput.valueAsDate = ahora;
+            if (horaInput) horaInput.value = `${String(ahora.getHours()).padStart(2, '0')}:${String(ahora.getMinutes()).padStart(2, '0')}`;
+
+            const inputFuncionario = document.getElementById('bajaFuncionario');
+            if (inputFuncionario) {
+                inputFuncionario.value = '';
+            }
+
+            const modal = document.getElementById('modalBaja');
+            if (modal) modal.style.display = 'flex';
+        }
+
+        function cerrarModalBaja() {
+            const modal = document.getElementById('modalBaja');
+            if (modal) modal.style.display = 'none';
+            const form = document.getElementById('formBaja');
+            if (form) form.reset();
+        }
+
+        async function guardarBaja(event) {
+            event.preventDefault();
+
+            const funcionarioTurno = document.getElementById('bajaFuncionario').value.trim();
+            if (!funcionarioTurno) {
+                alert("Por favor ingrese el nombre del funcionario responsable del turno.");
+                return;
+            }
+
+            const datosBaja = {
+                codigo_objeto: parseInt(document.getElementById('bajaCodigoElemento').value),
+                tipo_salida: document.getElementById('bajaEstado').value,
+                fecha_salida: document.getElementById('bajaFecha').value,
+                hora_salida: document.getElementById('bajaHora').value,
+                categoria_retira: document.getElementById('bajaCategoria').value,
+                nombre_retira: document.getElementById('bajaNombre').value,
+                funcionario_turno: funcionarioTurno,
+                funcionario_entrega: funcionarioTurno,
+                id_funcionario: usuarioActivo.id_usuario
+            };
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/objetos/baja`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(datosBaja)
+                });
+
+                if (!response.ok) throw new Error('Error al registrar la salida en el servidor');
+
+                const resultado = await response.json();
+                alert(resultado.mensaje);
+
+                cerrarModalBaja();
+                cargarTablaRegistro();
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            }
+        }
+
+        window.onload = function() {
+            cargarTablaRegistro();
+        };
     </script>
     
 </body>
