@@ -4,12 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔎</text></svg>">
-    <title>Objetos Recuperados EAN</title> 
+    <title>Objetos Recuperados EAN</title>
     <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
 
-    <!-- Encabezado -->
     <header class="navbar">
         <div class="navbar-brand">
             <img src="logo u.png" alt="Logo Universidad EAN" class="logo-ean">
@@ -19,12 +18,10 @@
     </header>
 
     <main class="container">
-        <!-- Instrucciones Pedagógicas -->
         <div class="alert-info">
             <p><strong>Comunidad Universitaria:</strong> Busca tu objeto en nuestro catálogo. Si lo identificas, haz click en <em>"Reclamar"</em> y diligencia los datos solicitados. Recuerda que debes tener el dato del espacio físico donde lo dejaste y acercarte a la central de seguridad en el <strong>sótano 1</strong> de lunes a viernes en los espacios de 9am a 11am y 5pm a 7pm, los sábados de 9am a 12m.</p>
         </div>
 
-        <!-- Barra de Filtros Pública -->
         <div class="filters-bar">
             <input type="date" id="filtroFecha" class="form-control" title="Filtrar por fecha de hallazgo" onchange="aplicarFiltros()">
             <select id="filtroClasificacion" class="form-control" title="Categoría del objeto" onchange="aplicarFiltros()">
@@ -38,19 +35,10 @@
             <button class="btn-primary" onclick="limpiarFiltros()">Mostrar Todos</button>
         </div>
 
-        <!-- Cuadrícula Dinámica de Objetos -->
-        <div class="objects-grid" id="catalogoPublico">
-            <!-- Los objetos se inyectarán aquí mediante JavaScript desde Supabase -->
-        </div>
-
-        <!-- Cuadrícula Dinámica de Objetos -->
         <div class="objects-grid" id="catalogoPublico"></div>
-
-        <!-- Controles de Paginación -->
         <div id="paginacionPublica" class="pagination-wrapper"></div>
     </main>
 
-    <!-- Modal de Reclamación Pública -->
     <div id="modalReclamo" class="modal-overlay">
         <div class="modal-content">
             <div class="modal-header">
@@ -65,7 +53,6 @@
                     </p>
                 </div>
                 
-                <!-- Identificador interno oculto -->
                 <input type="hidden" id="reclamoCodigoElemento">
 
                 <div class="form-group">
@@ -89,20 +76,16 @@
     </div>
 
     <script>
-        // Variable global para mantener el inventario traído desde Supabase
+        const API_BASE_URL = '';
+        const ITEMS_POR_PAGINA_PUBLICA = 12;
+
         let objetosInventario = [];
+        let objetosFiltradosPublicos = [];
+        let paginaActualPublica = 1;
 
-        // Definir la URL base de tu backend desplegado en Vercel
-        // En index.html (y demás archivos HTML)
-        const API_BASE_URL = ''; // Al dejarlo vacío, usará automáticamente la misma URL de Vercel
-
-        // ==========================================
-        // 1. Cargar Objetos desde la API REST (FastAPI / Supabase)
-        // ==========================================
         async function cargarObjetosDesdeAPI() {
             const contenedor = document.getElementById('catalogoPublico');
             try {
-                // 👈 Se agrega el endpoint /api/objetos
                 const response = await fetch(`${API_BASE_URL}/api/objetos`);
                 if (!response.ok) throw new Error('Error al conectar con la base de datos');
 
@@ -120,9 +103,72 @@
             }
         }
 
-        // ==========================================
-        // 2. Motor de Renderizado del Catálogo
-        // ==========================================
+        function generarBotonesPaginacion(contenedorId, totalItems, paginaActual, itemsPorPagina, callbackCambioPagina) {
+            const contenedor = document.getElementById(contenedorId);
+            if (!contenedor) return;
+
+            const totalPaginas = Math.ceil(totalItems / itemsPorPagina);
+            if (totalPaginas <= 1) {
+                contenedor.innerHTML = totalItems > 0 
+                    ? `<span class="pagination-info">Mostrando ${totalItems} registro(s)</span>` 
+                    : '';
+                return;
+            }
+
+            const inicio = (paginaActual - 1) * itemsPorPagina + 1;
+            const fin = Math.min(paginaActual * itemsPorPagina, totalItems);
+
+            let html = `<span class="pagination-info">Mostrando <strong>${inicio}–${fin}</strong> de <strong>${totalItems}</strong> objetos</span>`;
+            html += `<div class="pagination-controls">`;
+            html += `<button class="page-btn" ${paginaActual === 1 ? 'disabled' : ''} onclick="${callbackCambioPagina}(${paginaActual - 1})">« Anterior</button>`;
+
+            const paginas = [];
+            const delta = 1;
+
+            for (let i = 1; i <= totalPaginas; i++) {
+                if (i === 1 || i === totalPaginas || (i >= paginaActual - delta && i <= paginaActual + delta)) {
+                    paginas.push(i);
+                } else if (paginas[paginas.length - 1] !== '...') {
+                    paginas.push('...');
+                }
+            }
+
+            paginas.forEach(p => {
+                if (p === '...') {
+                    html += `<span class="page-ellipsis">...</span>`;
+                } else {
+                    html += `<button class="page-btn ${p === paginaActual ? 'active' : ''}" onclick="${callbackCambioPagina}(${p})">${p}</button>`;
+                }
+            });
+
+            html += `<button class="page-btn" ${paginaActual === totalPaginas ? 'disabled' : ''} onclick="${callbackCambioPagina}(${paginaActual + 1})">Siguiente »</button>`;
+            html += `</div>`;
+            contenedor.innerHTML = html;
+        }
+
+        function cambiarPaginaPublica(nuevaPagina) {
+            paginaActualPublica = nuevaPagina;
+            renderizarPaginaPublica();
+            document.getElementById('catalogoPublico')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function renderizarPaginaPublica() {
+            const totalPaginas = Math.ceil(objetosFiltradosPublicos.length / ITEMS_POR_PAGINA_PUBLICA) || 1;
+            if (paginaActualPublica > totalPaginas) paginaActualPublica = totalPaginas;
+
+            const inicio = (paginaActualPublica - 1) * ITEMS_POR_PAGINA_PUBLICA;
+            const segmento = objetosFiltradosPublicos.slice(inicio, inicio + ITEMS_POR_PAGINA_PUBLICA);
+
+            renderizarTarjetas(segmento);
+            generarBotonesPaginacion(
+                'paginacionPublica',
+                objetosFiltradosPublicos.length,
+                paginaActualPublica,
+                ITEMS_POR_PAGINA_PUBLICA,
+                'cambiarPaginaPublica'
+            );
+        }
+
         function renderizarTarjetas(listaObjetos) {
             const contenedor = document.getElementById('catalogoPublico');
             if (!contenedor) return;
@@ -162,14 +208,11 @@
             });
         }
 
-        // ==========================================
-        // 3. Lógica de Filtrado Público
-        // ==========================================
         function aplicarFiltros() {
             const fechaFiltro = document.getElementById('filtroFecha').value;
             const clasificacionFiltro = document.getElementById('filtroClasificacion').value;
 
-            const filtrados = objetosInventario.filter(obj => {
+            objetosFiltradosPublicos = objetosInventario.filter(obj => {
                 const esActivo = obj.estado_actual === 'Activo';
                 const coincideFecha = fechaFiltro === "" || obj.fecha_hallazgo === fechaFiltro;
                 const coincideClasificacion = clasificacionFiltro === "" || obj.clasificacion === clasificacionFiltro;
@@ -177,7 +220,8 @@
                 return esActivo && coincideFecha && coincideClasificacion;
             });
 
-            renderizarTarjetas(filtrados);
+            paginaActualPublica = 1;
+            renderizarPaginaPublica();
         }
 
         function limpiarFiltros() {
@@ -186,9 +230,6 @@
             aplicarFiltros();
         }
 
-        // ==========================================
-        // 4. Flujo de Reclamación
-        // ==========================================
         const modalReclamo = document.getElementById('modalReclamo');
         const formReclamo = document.getElementById('formReclamo');
 
@@ -204,43 +245,40 @@
         }
 
         async function procesarReclamo(event) {
-    event.preventDefault();
+            event.preventDefault();
 
-    const codigoObjeto = parseInt(document.getElementById('reclamoCodigoElemento').value);
-    const nombreSolicitante = document.getElementById('reclamoNombre').value.trim();
-    const correoInstitucional = document.getElementById('reclamoCorreo').value.trim();
-    const telefonoContacto = document.getElementById('reclamoContacto').value.trim();
+            const codigoObjeto = parseInt(document.getElementById('reclamoCodigoElemento').value);
+            const nombreSolicitante = document.getElementById('reclamoNombre').value.trim();
+            const correoInstitucional = document.getElementById('reclamoCorreo').value.trim();
+            const telefonoContacto = document.getElementById('reclamoContacto').value.trim();
 
-    const payload = {
-        codigo_objeto: codigoObjeto,
-        nombre_solicitante: nombreSolicitante,
-        correo_institucional: correoInstitucional,
-        telefono_contacto: telefonoContacto
-    };
+            const payload = {
+                codigo_objeto: codigoObjeto,
+                nombre_solicitante: nombreSolicitante,
+                correo_institucional: correoInstitucional,
+                telefono_contacto: telefonoContacto
+            };
 
-    try {
-        // Llama a la ruta relativa en Vercel
-        const response = await fetch(`${API_BASE_URL}/api/objetos/solicitar-reclamo`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/objetos/solicitar-reclamo`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
 
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.detail || 'Error al procesar la solicitud');
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || 'Error al procesar la solicitud');
+                }
+
+                alert(`¡Solicitud enviada exitosamente, ${nombreSolicitante}!\n\nRevisa tu correo (${correoInstitucional}) con las instrucciones para acercarte a la Central de Seguridad en el Sótano 1.`);
+                cerrarModalReclamo();
+            } catch (error) {
+                console.error("Error al procesar la solicitud:", error);
+                alert(`Hubo un problema al enviar tu solicitud: ${error.message}`);
+            }
         }
 
-        alert(`¡Solicitud enviada exitosamente, ${nombreSolicitante}!\n\nRevisa tu correo (${correoInstitucional}) con las instrucciones para acercarte a la Central de Seguridad en el Sótano 1.`);
-
-        cerrarModalReclamo();
-    } catch (error) {
-        console.error("Error al procesar la solicitud:", error);
-        alert(`Hubo un problema al enviar tu solicitud: ${error.message}`);
-    }
-}
-
-        // Inicialización
         window.onload = function() {
             cargarObjetosDesdeAPI();
         };
