@@ -168,23 +168,46 @@ def procesar_baja(baja: BajaRequest):
                 (baja.tipo_salida, baja.codigo_objeto)
             )
             if not cur.fetchone():
-                raise HTTPException(status_code=404, detail="Objeto no encontrado.")
+                raise HTTPException(status_code=404, detail=f"Objeto #{baja.codigo_objeto} no encontrado.")
+
+            id_func_valido = None
+            if baja.id_funcionario is not None:
+                cur.execute("SELECT id_usuario FROM usuarios WHERE id_usuario = %s;", (baja.id_funcionario,))
+                if cur.fetchone():
+                    id_func_valido = baja.id_funcionario
 
             cur.execute("""
-                INSERT INTO trazabilidad_salidas (
-                    codigo_objeto, tipo_salida, fecha_salida, hora_salida,
-                    categoria_retira, nombre_retira, id_funcionario, funcionario_entrega
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s);
-            """, (
-                baja.codigo_objeto,
-                baja.tipo_salida,
-                baja.fecha_salida,
-                baja.hora_salida,
-                baja.categoria_retira,
-                baja.nombre_retira,
-                baja.id_funcionario,
-                responsable
-            ))
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_schema = 'public' AND table_name = 'trazabilidad_salidas';
+            """)
+            columnas_reales = {row["column_name"] for row in cur.fetchall()}
+
+            datos_posibles = {
+                "codigo_objeto": baja.codigo_objeto,
+                "tipo_salida": baja.tipo_salida,
+                "fecha_salida": baja.fecha_salida,
+                "hora_salida": baja.hora_salida,
+                "categoria_retira": baja.categoria_retira,
+                "nombre_retira": baja.nombre_retira,
+                "id_funcionario": id_func_valido,
+                "id_usuario": id_func_valido,
+                "funcionario_turno": responsable,
+                "funcionario_entrega": responsable,
+            }
+
+            columnas_insertar = [col for col in datos_posibles if col in columnas_reales]
+            if not columnas_insertar:
+                raise HTTPException(status_code=500, detail="La tabla trazabilidad_salidas no tiene columnas compatibles.")
+
+            valores = [datos_posibles[col] for col in columnas_insertar]
+            placeholders = ", ".join(["%s"] * len(columnas_insertar))
+            nombres_sql = ", ".join(columnas_insertar)
+
+            cur.execute(
+                f"INSERT INTO trazabilidad_salidas ({nombres_sql}) VALUES ({placeholders});",
+                tuple(valores)
+            )
             conn.commit()
             return {"mensaje": f"Salida del objeto #{baja.codigo_objeto} registrada exitosamente."}
     except HTTPException:
@@ -192,7 +215,7 @@ def procesar_baja(baja: BajaRequest):
         raise
     except Exception as e:
         conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Error SQL en baja: {str(e)}")
     finally:
         conn.close()
 
