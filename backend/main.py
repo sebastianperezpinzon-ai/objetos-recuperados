@@ -73,22 +73,26 @@ class UsuarioCreate(BaseModel):
 
 
 # ==========================================
-# Utilidad de Notificaciones por Correo
+# Utilidad de Notificaciones por Correo (Brevo SMTP)
 # ==========================================
 def enviar_correo_reclamo(reclamo: ReclamoRequest, info_objeto: dict):
-    smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
-    smtp_port = int(os.getenv("SMTP_PORT", "587"))
-    smtp_user = os.getenv("SMTP_USER")
-    smtp_password = os.getenv("SMTP_PASSWORD")
-    correo_logistica = os.getenv("CORREO_LOGISTICA")
+    smtp_host = os.getenv("SMTP_HOST", "smtp-relay.brevo.com").strip()
+    smtp_port = int(os.getenv("SMTP_PORT", "587").strip())
+    smtp_user = os.getenv("SMTP_USER", "").strip()
+    smtp_password = os.getenv("SMTP_PASSWORD", "").strip()
+    sender_email = os.getenv("SENDER_EMAIL", smtp_user).strip()
+    correo_logistica = os.getenv("CORREO_LOGISTICA", "").strip()
 
     if not smtp_user or not smtp_password:
-        raise RuntimeError("Faltan las credenciales SMTP_USER o SMTP_PASSWORD en las variables de entorno.")
+        raise RuntimeError("Faltan las credenciales SMTP_USER o SMTP_PASSWORD de Brevo en Vercel.")
 
-    # 1. Correo de confirmación para el solicitante (Comunidad Universitaria)
+    if not sender_email:
+        raise RuntimeError("Falta configurar SENDER_EMAIL (remitente verificado en Brevo).")
+
+    # 1. Correo de confirmación para el solicitante
     msg_usuario = MIMEMultipart("alternative")
     msg_usuario["Subject"] = f"Solicitud de Reclamación - Objeto #{reclamo.codigo_objeto} (ECO-S)"
-    msg_usuario["From"] = f"Objetos Recuperados EAN <{smtp_user}>"
+    msg_usuario["From"] = f"Objetos Recuperados EAN <{sender_email}>"
     msg_usuario["To"] = reclamo.correo_institucional
 
     cuerpo_html_usuario = f"""
@@ -119,7 +123,9 @@ def enviar_correo_reclamo(reclamo: ReclamoRequest, info_objeto: dict):
     msg_usuario.attach(MIMEText(cuerpo_html_usuario, "html", "utf-8"))
 
     with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as server:
+        server.ehlo()
         server.starttls()
+        server.ehlo()
         server.login(smtp_user, smtp_password)
         server.send_message(msg_usuario)
 
@@ -127,7 +133,7 @@ def enviar_correo_reclamo(reclamo: ReclamoRequest, info_objeto: dict):
         if correo_logistica:
             msg_logistica = MIMEMultipart("alternative")
             msg_logistica["Subject"] = f"[ECO-S Alerta] Nuevo reclamo para Objeto #{reclamo.codigo_objeto}"
-            msg_logistica["From"] = f"Sistema ECO-S <{smtp_user}>"
+            msg_logistica["From"] = f"Sistema ECO-S <{sender_email}>"
             msg_logistica["To"] = correo_logistica
 
             cuerpo_logistica = f"""
